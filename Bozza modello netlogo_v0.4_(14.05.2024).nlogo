@@ -1,5 +1,7 @@
 ;problems to be solved/adressed: look for CHECK or FIX
 
+extensions [matrix]
+breed [users user]
 breed [companies company]
 breed [products product]
 

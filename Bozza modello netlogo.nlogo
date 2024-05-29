@@ -64,11 +64,10 @@ products-own [
   p-quality-norm
   p-acceptance-norm
 
-<<<<<<< HEAD
+
   p-shelf-life
-=======
   shelf-life
->>>>>>> 193fe54922fadc0dc0784e42e6d12239bd87f0bb
+
 ]
 
 ; Define global variables

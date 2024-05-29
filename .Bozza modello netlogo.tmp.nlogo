@@ -434,8 +434,8 @@ end
 
 
 
-if [type ] of products == "product 1" [
-   if [ residual-life ] of products < threshold-2 [
+if [type ] of merce == "merce 1" [
+   if [ residual-life ] of merce < threshold-res-lif-1 [
 ; sapendo che la percentuale di 1 che diventa 2 dopo la vita residua è pct-1-2 e quelal che diventa rifiuto è pct-1-waste
 let amount-good amount
 hatch-merce 1 [

@@ -4,6 +4,7 @@ extensions [matrix]
 breed [users user]
 breed [companies company]
 breed [products product]
+undirected-link-breed [product-company-links product-company-link]
 
 ; Define users attributes
 users-own [
@@ -24,6 +25,8 @@ users-own [
   best-company ;it is the i of max_i
   buy-bool
   total-consumption
+
+  best-product
 ]
 
 ; Define companies attributes
@@ -77,7 +80,7 @@ products-own [
 ; Define global variables
 globals [
   n ;number of companies
-  n-products
+  ;n-products
   max-price-possibile
   max-budget
   target-demand-max
@@ -93,6 +96,7 @@ globals [
   threshold-1
   threshold-2
 ]
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -141,11 +145,11 @@ create-users n-users[
     set total-consumption 0 ;v0.4
 
     set trigger mean-trigger
-    set beta random-float 1
-    set gamma random-float 1
-    set alpha random-float 1
-    set delta random-float 1
-    set omega random-float 1
+    set beta random-float 1  ;susteinability
+    set gamma random-float 1 ;prezzo
+    set alpha random-float 1 ;quality
+    set delta random-float 1 ;acceptance
+    set omega random-float 1 ;residual-life
 
      ]
 
@@ -156,16 +160,21 @@ create-products n-products [
     set color red
       set p-sustainability random-float 1
       set p-price random 10 ;FIX
-      set target-price p-price
+      set p-quality random 10 ;FIX
+      set p-acceptance random-float 1; fix
+      set p-residual-life random 10   ;fix ASK PROF (maybe from excel file?)
+
+      set p-amount random 10   ;fix
+      ;set target-price p-price
       set p-cost 1 ;for now, the production cost is the same for each company
 
     ;v0.5
   set threshold-1 (1 / 3) * p-shelf-life  ;here i can set it differently for the food vs fashion sector
   set threshold-2 (2 / 3) * p-shelf-life
 
-  set p-residual-life random 10   ;fix ASK PROF (maybe from excel file?)
 
-  set p-amount random 10   ;fix
+
+
   ]
 
   create-companies n-companies [
@@ -191,12 +200,18 @@ create-products n-products [
     set counter-decrease-sust 0
 
   ]
-
-
-
   ; Initialize company price
   ; Initialize company attributes, production capabilities etc...
+
+
+  ; Create links between products and companies
+  ask products [
+    let random-company one-of companies
+    create-product-company-link-with random-company
+  ]
+
 end
+
 
 ;to update-product-demand-history
 ;  let current-demand company-demand
@@ -217,6 +232,7 @@ to go
   price-demand-regulation
   sustainability-demand-regulation
   discount
+  ;reprocess
   tick
 end
 
@@ -243,14 +259,12 @@ to utility-function-management
   let min-residual-life min [ p-residual-life ] of products
 
   ; compute for each company the normalized score for price and sustainabilty
-  ask companies [
+  ask products [
     set p-sustainability-norm (p-sustainability - min-sustainability) / (max-sustainability - min-sustainability)
     set p-price-norm (p-price - min-price) / (max-price - min-price)
     set p-quality-norm (p-quality - min-quality) / (max-quality - min-quality)
     set p-acceptance-norm (p-acceptance - min-acceptance) / (max-acceptance - min-acceptance)
     set p-residual-life-norm (p-residual-life - min-residual-life) / (max-residual-life - min-residual-life)
-
-
   ]
 
   ; find the best company according to each user preference
@@ -262,13 +276,16 @@ to utility-function-management
     let my-delta delta ; acceptance-weight
     let my-omega omega ; residual life-weight
 
-    set best-company max-one-of companies [p-quality-norm * my-alpha + p-sustainability-norm * my-beta - p-price-norm * my-gamma - p-acceptance-norm * my-delta + p-residual-life-norm * my-omega]
+
+    set best-product max-one-of products [p-quality-norm * my-alpha + p-sustainability-norm * my-beta - p-price-norm * my-gamma - p-acceptance-norm * my-delta + p-residual-life-norm * my-omega]
+
     set utility ([p-quality-norm] of best-company * my-alpha)
                  + ([ p-sustainability-norm ] of best-company * my-beta)
                  - ([ p-price-norm ] of best-company * my-gamma)
                  - ([p-acceptance-norm] of best-company * my-delta)
                  + ([p-residual-life-norm] of best-company * my-omega)
 
+    set best-company one-of [other-end] of my-links with [best-product]
   ]
 
 
@@ -401,7 +418,6 @@ to sustainability-demand-regulation
     ]
 end
 
-
 to discount
   ask products [
     set p-residual-life p-residual-life - 1
@@ -418,36 +434,30 @@ to discount
 end
 
 
-
 to reprocess
-  ask companies [
+  ask product 1[
+    hatch 1
+    ;set type "waste"
 
-    if (p-residual-life = threshold-2)[
-
-
-    ]
+;   if [who] of products = "1"[
+;  if [ p-residual-life ] of products < threshold-2 [
+;; sapendo che la percentuale di 1 che diventa 2 dopo la vita residua è pct-1-2 e quelal che diventa rifiuto è pct-1-waste
+;let p-amount-good
+;hatch product 1 [
+;set who  "merce 2"
+;set p-amount p-amount * pct-1-2
+;    ]
+;hatch-merce 1 [
+;set type "waste"
+;set p-amount p-amount * pct-1-waste
+;    ]
+;  ]
+;]
   ]
+
+
 
 end
-
-
-
-
-
-if [type ] of products == "product 1" [
-   if [ residual-life ] of products < threshold-2 [
-; sapendo che la percentuale di 1 che diventa 2 dopo la vita residua è pct-1-2 e quelal che diventa rifiuto è pct-1-waste
-let amount-good amount
-hatch-merce 1 [
-set type "merce 2"
-set p-amount p-amount * pct-1-2
-    ]
-hatch-merce 1 [
-set type "waste"
-set p-amount p-amount * pct-1-waste
-    ]
-  ]
-]
 @#$#@#$#@
 GRAPHICS-WINDOW
 289
@@ -519,7 +529,7 @@ n-companies
 n-companies
 1
 20
-7.0
+5.0
 1
 1
 agents
@@ -534,7 +544,7 @@ n-users
 n-users
 10
 500
-500.0
+90.0
 10
 1
 agents
@@ -682,7 +692,7 @@ n-products
 n-products
 1
 20
-11.0
+10.0
 1
 1
 NIL

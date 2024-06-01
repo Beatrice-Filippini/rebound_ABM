@@ -56,6 +56,7 @@ companies-own [
 
 ; Define product attributes
 products-own [
+  p-name
   p-price
   p-sustainability
   p-quality
@@ -74,6 +75,9 @@ products-own [
   p-residual-life
 
   p-amount
+  pct-1-hvr
+  pct-2-svr
+  pct-3-lvr
 
 ]
 
@@ -278,24 +282,39 @@ to utility-function-management
 
 
     set best-product max-one-of products [p-quality-norm * my-alpha + p-sustainability-norm * my-beta - p-price-norm * my-gamma - p-acceptance-norm * my-delta + p-residual-life-norm * my-omega]
+    print best-product
 
-    set utility ([p-quality-norm] of best-company * my-alpha)
-                 + ([ p-sustainability-norm ] of best-company * my-beta)
-                 - ([ p-price-norm ] of best-company * my-gamma)
-                 - ([p-acceptance-norm] of best-company * my-delta)
-                 + ([p-residual-life-norm] of best-company * my-omega)
+    set utility ([p-quality-norm] of best-product * my-alpha)
+                 + ([ p-sustainability-norm ] of best-product * my-beta)
+                 - ([ p-price-norm ] of best-product * my-gamma)
+                 - ([p-acceptance-norm] of best-product * my-delta)
+                 + ([p-residual-life-norm] of best-product * my-omega)
 
-    set best-company one-of [other-end] of my-links with [best-product]
-  ]
+;STAND-BY
+;ask companies[
+;    let target-link one-of product-company-links with [
+;      (end1 = myself and end2 = best-product) or
+;      (end2 = myself and end1 = best-product)
+;    ]
+;
+;    if target-link != nobody [
+;      ifelse [end1] of target-link = best-product [
+;        set best-company [end2] of target-link
+;      ] [
+;        set best-company [end1] of target-link
+;      ]
+;    ]
+;  ]
 
 
-
+;set best-company [other-end] of my-links with [best-product]
+;set best-company link who best-product company
   ;set utility-function (beta * sustainability-i ^ n) - (trigger * price-i ^ n)
 
     ;set target-price random max-target-price  ;here i assign each user a target-price as a random variable
      ; future application: assign the target price using real data/a normality function with mean= avg budget per person when shopping for textile products
     ;set budget-flexibility random-float 1
-
+ ]
 end
 
 to user-stock-allocation
@@ -318,11 +337,11 @@ to user-stock-allocation
       set buy-bool False
     ]
 
-    ask companies [
-      let n-buyers count users with [ best-company = myself and buy-bool ]
-      set company-demand n-buyers
-      set profit company-demand * (p-price - p-cost)
-    ]
+;    ask companies [
+;      let n-buyers count users with [ best-company = myself and buy-bool ]
+;      set company-demand n-buyers
+;      set profit company-demand * (p-price - p-cost)
+;    ]
   ]
 
 
@@ -435,24 +454,53 @@ end
 
 
 to reprocess
-  ask product 1[
-    hatch 1
-    ;set type "waste"
+  ask products[
+  if p-residual-life = threshold-2
+    [
+  ask product 1
+   [
+      let p-amount-good p-amount
+      hatch 1
+      [
+        ;esempio frutta matura-> macedonia
+    set p-name "higher value reprocess"
+    set p-amount p-amount-good * pct-1-hvr
+    set p-residual-life (1.1 * p-residual-life) ;fix
+    set p-price 1.1 * p-price ;fix
+    set p-sustainability 1.1 * p-sustainability; fix
+      ]
+  ]
 
-;   if [who] of products = "1"[
-;  if [ p-residual-life ] of products < threshold-2 [
-;; sapendo che la percentuale di 1 che diventa 2 dopo la vita residua è pct-1-2 e quelal che diventa rifiuto è pct-1-waste
-;let p-amount-good
-;hatch product 1 [
-;set who  "merce 2"
-;set p-amount p-amount * pct-1-2
-;    ]
-;hatch-merce 1 [
-;set type "waste"
-;set p-amount p-amount * pct-1-waste
-;    ]
-;  ]
-;]
+  ask  product 2
+    [
+    let p-amount-good p-amount
+      hatch 1
+      [
+        ;esempio frutta matura-> macedonia
+    set p-name "same value reprocess"
+    set p-amount p-amount-good * pct-2-svr
+    set p-residual-life (1.1 * p-residual-life) ;fix
+    set p-sustainability 1.1 * p-sustainability; fix
+      ]
+
+    ]
+
+  ask product 3
+    [
+    let p-amount-good p-amount
+      hatch 1
+      [
+        ;esempio frutta matura-> macedonia
+    set p-name "lower value reprocess"
+    set p-amount p-amount-good * pct-3-lvr
+    set p-residual-life (1.1 * p-residual-life) ;fix
+    set p-price 0.9 * p-price ;fix
+    set p-sustainability 1.1 * p-sustainability; fix
+      ]
+
+    ]
+
+    ]
   ]
 
 
@@ -529,7 +577,7 @@ n-companies
 n-companies
 1
 20
-5.0
+6.0
 1
 1
 agents
@@ -544,7 +592,7 @@ n-users
 n-users
 10
 500
-90.0
+80.0
 10
 1
 agents

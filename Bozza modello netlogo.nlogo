@@ -8,6 +8,7 @@ undirected-link-breed [product-company-links product-company-link]
 
 ; Define product attributes
 products-own [
+  ;settate con csv
   p-ID
   p-name
   p-price
@@ -16,8 +17,9 @@ products-own [
   p-acceptance
   p-shelf-life
   p-residual-life
-
   p-production-cost
+  my-company
+
 
   p-price-norm
   p-sustainability-norm
@@ -25,13 +27,13 @@ products-own [
   p-acceptance-norm
   p-residual-life-norm
 
-  p-amount
+  p-amount ;serve per funzione hatch
   pct-1-hvr
   pct-2-svr
   pct-3-lvr
   pct-4-w
 
-  my-company
+
 
 ]
 ; Define users attributes
@@ -144,24 +146,27 @@ to create-world
 end
 
 to import-data
+  clear-all
   let data csv:from-file "C:\\Users\\beafi\\OneDrive - UNIVERSITA' CARLO CATTANEO - LIUC\\TESI\\Tesi Beatrice Filippini\\Modello NetLogo\\rebound_ABM\\Input data.csv"
-    let header true
+   set n-products (length data - 1) ; number of products is the number of rows minus header row
+  let header true
   foreach data [
+    row ->
     if header [
       set header false
     ]
-      let p-IDs item 0 row
-      let p-names item 1 ?
-      let p-prices item 2 ?
-      let p-sustainabilitys item 3 ?
-      let p-qualitys item 4 ?
-      let p-acceptances item 5 ?
-      let p-shelf-lifes item 6 ?
-      let p-residual-lifes item 7 ?
-      let p-production-costs item 8 ?
-      let my-companys item 9 ?
+    let p-IDs item 0 row
+    let p-names item 1 row
+    let p-prices item 2 row
+    let p-sustainabilitys item 3 row
+    let p-qualitys item 4 row
+    let p-acceptances item 5 row
+    let p-shelf-lifes item 6 row
+    let p-residual-lifes item 7 row
+    let p-production-costs item 8 row
+    let my-companies item 9 row
 
-      create-product n-products [
+      create-products 1 [
         set p-IDs p-id
         set p-names p-name
         set p-prices p-price
@@ -171,32 +176,38 @@ to import-data
         set p-shelf-lifes p-shelf-life
         set p-residual-lifes p-residual-life
         set p-production-costs p-production-cost
-        set my-companys my-company
+        set my-companies my-company
       ]
-
   ]
 end
 
 
 to create-agents
 
+
+
+
+
+
+
+
   create-products n-products [
     set xcor random-xcor
     set ycor random-ycor
     set shape "box"
     set color red
-      set p-sustainability random-float 1
-      set p-price random 10 ;FIX
-      set p-quality random 10 ;FIX
-      set p-acceptance random-float 1; fix
-      set p-residual-life random 10 + 1  ;fix ASK PROF (maybe from excel file?)
-      set p-shelf-life random 10 + 1
-
-    set p-ID [1]; fix
+;      set p-sustainability random-float 1
+;      set p-price random 10 ;FIX
+;      set p-quality random 10 ;FIX
+;      set p-acceptance random-float 1; fix
+;      set p-residual-life random 10 + 1  ;fix ASK PROF (maybe from excel file?)
+;      set p-shelf-life random 10 + 1
+;
+;    set p-ID [1]; fix
 
       set p-amount random 10   ;fix
       ;set target-price p-price
-      set p-production-cost 1 ;for now, the production cost is the same for each company
+      ;set p-production-cost 1 ;for now, the production cost is the same for each company
 
     ;v0.5
   set threshold-1 (1 / 3) * p-shelf-life  ;here i can set it differently for the food vs fashion sector
@@ -314,6 +325,14 @@ to user-stock-consumption
 
 end
 
+to-report safe-divide [numerator denominator]
+  if denominator = 0 [
+    report 0
+  ]
+  report numerator / denominator
+end
+
+
 to utility-function-management
 
   ; compute the maximum and minumum of price and sustainability for products
@@ -338,10 +357,10 @@ to utility-function-management
     ]
     ;else
     [
-      set p-sustainability-norm (p-sustainability - min-sustainability) / (max-sustainability - min-sustainability)
-      set p-price-norm (p-price - min-price) / (max-price - min-price)
-      set p-quality-norm (p-quality - min-quality) / (max-quality - min-quality)
-      set p-acceptance-norm (p-acceptance - min-acceptance) / (max-acceptance - min-acceptance)
+     set p-sustainability-norm safe-divide (p-sustainability - min-sustainability) (max-sustainability - min-sustainability)
+      set p-price-norm safe-divide (p-price - min-price) (max-price - min-price)
+      set p-quality-norm safe-divide (p-quality - min-quality) (max-quality - min-quality)
+      set p-acceptance-norm safe-divide (p-acceptance - min-acceptance) (max-acceptance - min-acceptance)
 
     ]
 
@@ -357,13 +376,19 @@ to utility-function-management
     let my-omega omega ; residual life-weight
 
 
-    set best-product max-one-of products [ ( p-quality-norm * my-alpha + p-sustainability-norm * my-beta - p-price-norm * my-gamma ) * (p-acceptance-norm * my-delta) * ( (p-residual-life / p-shelf-life) * my-omega)]
+    set best-product max-one-of products
+    [ ( p-quality-norm * my-alpha + p-sustainability-norm * my-beta - p-price-norm * my-gamma )
+      * (p-acceptance-norm * my-delta)
+      * (safe-divide (p-residual-life * my-omega) p-shelf-life)
+    ]
 
 
     set utility ( ([p-quality-norm] of best-product * my-alpha)
                  + ([ p-sustainability-norm ] of best-product * my-beta)
                  - ([ p-price-norm ] of best-product * my-gamma)
-                ) * ([p-acceptance-norm] of best-product * my-delta) * ([ p-residual-life / p-shelf-life ] of best-product * my-omega)
+                )
+              * ([p-acceptance-norm] of best-product * my-delta)
+    * ( safe-divide ([p-residual-life] of best-product * my-omega) [p-shelf-life] of best-product)
 
     print best-product
     set best-company [my-company] of best-product
@@ -623,9 +648,9 @@ precision mean [ p-sustainability ] of companies  2
 MONITOR
 1005
 244
-1189
+1200
 305
-Mean Stock of Clothes
+Mean Stock of Products
 precision mean [ stock ] of users 2
 17
 1
@@ -671,7 +696,7 @@ PLOT
 196
 978
 350
-Stock of clothes
+Stock of products
 NIL
 NIL
 0.0
@@ -740,7 +765,7 @@ n-products
 n-products
 1
 20
-1.0
+4.0
 1
 1
 NIL

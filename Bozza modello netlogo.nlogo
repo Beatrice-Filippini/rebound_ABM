@@ -96,7 +96,7 @@ globals [
   product-demand-history
   c ;clothes consumption rate
   stock-threshold
-  init-stock
+  max-init-stock
   mean-trigger
  ;v0.4
   price-period
@@ -115,10 +115,12 @@ globals [
 to setup
   clear-all
   file-close-all
+  init-globals
+
   create-world
   import-data
   create-agents
-  init-globals
+
   reset-ticks
 end
 
@@ -131,10 +133,10 @@ to init-globals ; NOTE: only here in the code i can have numbers because i'm set
   set target-demand-max 30
 
   set product-demand-history []
-  set c 0.02 ; consumption rate of stock: CHECK for literature
+  set c 0.1 ; consumption rate of stock: CHECK for literature - for fashion ok around 2% vs for food a bit higher
   set stock-threshold 20
-  set init-stock 10
-  set mean-trigger 1
+  set max-init-stock 10
+  set mean-trigger 100
   set product-demand-history[]
   set price-period 4 ;hp: i do not need a long period of time with sales<target in order to change the price (f.e. 4 weeks)
   set sust-period 12 ;hp: before implementing changes in the sustainability practices, i need to observe low sales for a longer period of time (f.e. 3 months)
@@ -219,17 +221,19 @@ create-users n-users[
     set ycor random-ycor
     set shape "person"
     set color blue
-    set stock random-float init-stock
+    set stock random-float max-init-stock
     set stock-input 0
     set buy-bool False ; at the beginning they does not buy
     set total-consumption 0 ;v0.4
 
     set trigger mean-trigger
+    set stock-threshold 20
     set beta random-float 1  ;susteinability
     set gamma random-float 1 ;prezzo
     set alpha random-float 1 ;quality
     set delta random-float 1 ;acceptance
     set omega random-float 1 ;residual-life
+  ;print (word "Initial stock for user " who ": " stock "and" "max-init-stock: " max-init-stock)
 
      ]
 
@@ -388,9 +392,9 @@ to utility-function-management
                  - ([ p-price-norm ] of best-product * my-gamma)
                 )
               * ([p-acceptance-norm] of best-product * my-delta)
-    * ( safe-divide ([p-residual-life] of best-product * my-omega) [p-shelf-life] of best-product)
+    * ([p-residual-life] of best-product * my-omega) / [p-shelf-life] of best-product
 
-    print best-product
+
     set best-company [my-company] of best-product
  ]
 end
@@ -398,7 +402,8 @@ end
 to user-stock-allocation
 
   ask users [
-    ifelse stock / stock-threshold <= utility * trigger [
+    print  (word "User " who ", breed: " breed " utility: " utility)
+    ifelse (stock / stock-threshold) <= (utility * trigger) [
       set buy-bool True ; the user buys an item
       set stock stock + 1
       set total-consumption count users with [ buy-bool]  ; Calculate total consumption
@@ -420,7 +425,7 @@ to user-stock-allocation
 ;  ]
 ;  ask users [
 ;    set stock stock * (1 - c) + stock-input ;usury
-;    let ratio stock / stock-treshold ; decision-making ratio
+;    let ratio stock / old ; decision-making ratio
 ;    ifelse ratio < max utility * trigger [
 ;      set stock-input 1 ;
 ;    ]
@@ -651,7 +656,7 @@ MONITOR
 1200
 305
 Mean Stock of Products
-precision mean [ stock ] of users 2
+mean [ stock ] of users
 17
 1
 15

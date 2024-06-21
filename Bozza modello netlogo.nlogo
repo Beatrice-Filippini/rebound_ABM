@@ -19,7 +19,7 @@ products-own [
   p-residual-life
   p-production-cost
   my-company
-
+  owner-id
 
   p-price-norm
   p-sustainability-norm
@@ -32,9 +32,6 @@ products-own [
   pct-2-svr
   pct-3-lvr
   pct-4-w
-
-
-
 ]
 ; Define users attributes
 users-own [
@@ -193,7 +190,7 @@ to create-agents
 
 
 
-  create-products n-products [
+ create-products n-products [
     set xcor random-xcor
     set ycor random-ycor
     set shape "box"
@@ -203,7 +200,7 @@ to create-agents
 ;      set p-quality random 10 ;FIX
 ;      set p-acceptance random-float 1; fix
 ;      set p-residual-life random 10 + 1  ;fix ASK PROF (maybe from excel file?)
-;      set p-shelf-life random 10 + 1
+      set p-shelf-life random 10 + 1
 ;
 ;    set p-ID [1]; fix
 
@@ -379,23 +376,30 @@ to utility-function-management
     let my-delta delta ; acceptance-weight
     let my-omega omega ; residual life-weight
 
+    let utilities []
+    let other_who []
 
-    set best-product max-one-of products
-    [ ( p-quality-norm * my-alpha + p-sustainability-norm * my-beta - p-price-norm * my-gamma )
-      * (p-acceptance-norm * my-delta)
-      * (safe-divide (p-residual-life * my-omega) p-shelf-life)
-    ]
+ask products[
+
+    let utility-product random-float 5
+;    ( ([p-quality-norm] of best-product * my-alpha)
+;                 + ([ p-sustainability-norm ] of best-product * my-beta)
+;                 - ([ p-price-norm ] of best-product * my-gamma)
+;                )
+;              * ([p-acceptance-norm] of best-product * my-delta)
+;    * ([p-residual-life] of best-product * my-omega) / [p-shelf-life] of best-product
+
+   set utilities lput utility-product utilities
+   set other_who lput p-ID other_who
+       ]
+
+    let max-utility max utilities
+    let index-score position max-utility utilities
+    let my-best-product item index-score other_who
+    set best-product my-best-product
 
 
-    set utility ( ([p-quality-norm] of best-product * my-alpha)
-                 + ([ p-sustainability-norm ] of best-product * my-beta)
-                 - ([ p-price-norm ] of best-product * my-gamma)
-                )
-              * ([p-acceptance-norm] of best-product * my-delta)
-    * ([p-residual-life] of best-product * my-omega) / [p-shelf-life] of best-product
-
-
-    set best-company [my-company] of best-product
+    ;set best-company [my-company] of best-product
  ]
 end
 

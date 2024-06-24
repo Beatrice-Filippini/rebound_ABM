@@ -18,6 +18,7 @@ products-own [
   p-residual-life
   p-production-cost
   owner-ID
+  p-amount
 
   ;used for utility calculations
   p-price-norm
@@ -25,9 +26,13 @@ products-own [
   p-quality-norm
   p-acceptance-norm
   p-residual-life-norm
+  p-utility
 
   ;used in the hatch function
-  p-amount
+  p-amount-hvr
+  p-amount-svr
+  p-amount-lvr
+  p-amount-w
   pct-1-hvr
   pct-2-svr
   pct-3-lvr
@@ -35,7 +40,7 @@ products-own [
  ]
 
 users-own [
-  utility
+  utility-best-product
   beta         ;linked to sustainability
   gamma        ;linked to price
   alpha        ;linked to quality
@@ -43,7 +48,6 @@ users-own [
   omega        ;linked to RL/SL
 
   stock
-  stock-input  ;how many items the user buys at a given time
   trigger      ;used to evaluate whether to buy
   stock-threshold
   c            ;stock consumption rate
@@ -62,8 +66,8 @@ companies-own [
 
 globals [
   max-init-stock
-  threshold-1    ;1/3 of shelf life
-  threshold-2    ;2/3 of shelf life
+  threshold-1    ;will be used for the reprocessing procedure
+  threshold-2    ;will be used for the reduction of price
 ]
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -82,9 +86,12 @@ to setup
 end
 
 to init-globals ; NOTE: only here in the code i can have numbers because i'm setting the global variables
+  ask turtles ;FIX: ask prof
+  [
   set max-init-stock 30
   set threshold-1 (1 / 3) * p-shelf-life  ;here i can set it differently for the food vs fashion sector
   set threshold-2 (2 / 3) * p-shelf-life
+  ]
 end
 
 to create-world
@@ -96,155 +103,93 @@ to import-data
   let data csv:from-file "C:\\Users\\beafi\\OneDrive - UNIVERSITA' CARLO CATTANEO - LIUC\\TESI\\Tesi Beatrice Filippini\\Modello NetLogo\\rebound_ABM\\Input data.csv"
    set n-products (length data - 1) ; number of products is the number of rows minus header row
   let header true
-  foreach data [
+  foreach data
+  [
     row ->
-    if header [
-      set header false
+    if header
+    [
+    set header false
     ]
     let p-IDs item 0 row
     let p-names item 1 row
     let p-prices item 2 row
-    let p-sustainabilitys item 3 row
-    let p-qualitys item 4 row
+    let p-sustainabilities item 3 row
+    let p-qualities item 4 row
     let p-acceptances item 5 row
-    let p-shelf-lifes item 6 row
-    let p-residual-lifes item 7 row
+    let p-shelf-lives item 6 row
+    let p-residual-lives item 7 row
     let p-production-costs item 8 row
-    let owner-ID item 9 row
+    let owner-IDs item 9 row
+    let p-amounts item 10 row
 
-      create-products 1 [
-        set p-IDs p-id
-        set p-names p-name
-        set p-prices p-price
-        set p-sustainabilities p-sustainability
-        set p-qualities p-quality
-        set p-acceptances p-acceptance
-        set p-shelf-lives p-shelf-life
-        set p-residual-lives p-residual-life
-        set p-production-costs p-production-cost
-        set owner-IDs owner-ID
-      ]
+    create-products 1
+    [
+    set p-IDs p-id
+    set p-names p-name
+    set p-prices p-price
+    set p-sustainabilities p-sustainability
+    set p-qualities p-quality
+    set p-acceptances p-acceptance
+    set p-shelf-lives p-shelf-life
+    set p-residual-lives p-residual-life
+    set p-production-costs p-production-cost
+    set owner-IDs owner-ID
+    set p-amounts p-amount
+    ]
   ]
 end
 
-
 to create-agents
 
-
- create-products n-products [
+create-products n-products
+  [
     set xcor random-xcor
     set ycor random-ycor
     set shape "box"
     set color red
-;      set p-sustainability random-float 1
-;      set p-price random 10 ;FIX
-;      set p-quality random 10 ;FIX
-;      set p-acceptance random-float 1; fix
-;      set p-residual-life random 10 + 1  ;fix ASK PROF (maybe from excel file?)
-      set p-shelf-life random 10 + 1
-;
-;    set p-ID [1]; fix
-
-      set p-amount random 10   ;fix
-      ;set target-price p-price
-      ;set p-production-cost 1 ;for now, the production cost is the same for each company
-
-    ;v0.5
-
-
+    set pct-1-hvr 0.05 ;FIX ask prof
+    set pct-2-svr 0.1
+    set pct-3-lvr 0.15
+    set pct-4-w 0.2
+    set p-utility 0
+    set p-amount-hvr 0
+    set p-amount-svr 0
+    set p-amount-lvr 0
+    set p-amount-w 0
   ]
-create-users n-users[
+
+create-users n-users
+  [
     set xcor random-xcor
     set ycor random-ycor
     set shape "person"
     set color blue
-    set stock random-float max-init-stock
-    set stock-input 0
-    set buy-bool False ; at the beginning they does not buy
-    set total-consumption 0 ;v0.4
-
-    set trigger mean-trigger
-    set stock-threshold 20
-    set beta random-float 1  ;susteinability
-    set gamma random-float 1 ;prezzo
+    set utility-best-product 0
+    set beta random-float 1  ;sustainability
+    set gamma random-float 1 ;price
     set alpha random-float 1 ;quality
     set delta random-float 1 ;acceptance
-    set omega random-float 1 ;residual-life
-  ;print (word "Initial stock for user " who ": " stock "and" "max-init-stock: " max-init-stock)
-
-    set c 0.1 ; consumption rate of stock: CHECK for literature - for fashion ok around 2% vs for food a bit higher
+    set omega random-float 1 ;RL/SL
+    set stock random-float max-init-stock
+    set buy-bool False ; at the beginning they does not buy
+    set trigger (85 + random 31)          ;FIX
     set stock-threshold 20
-     ]
+    set c 0.1 ; consumption rate of stock: CHECK for literature - for fashion ok around 2% vs for food a bit higher
+    set utility-best-product 0
+  ]
 
-
-  create-companies n-companies [
+create-companies n-companies
+  [
     setxy random-xcor random-ycor
     set color black
     set size 3
     set shape "factory"
-    ;let product-revenue p-price
-
-    ;set production-capability random 100
-    set profit product-revenue * company-demand
-    set target-demand random target-demand-max
-
-
-    ;v0.4
-    set bool-decrease-price False
-    set bool-increase-price False
-    set bool-increase-sust False
-    set bool-decrease-sust False
-    set counter-decrease-price 0
-    set counter-increase-price 0
-    set counter-increase-sust 0
-    set counter-decrease-sust 0
-
-  ]
-  ; Initialize company price
-  ; Initialize company attributes, production capabilities etc...
-
-
-  ; Create links between products and companies
-  ask products [
-    let random-company one-of companies
-    create-product-company-link-with random-company
+    set company-demand 0
+    set product-revenue 0
+    set profit 0
   ]
 
 end
-
-;to read-attributes-from-csv
-;  file-close-all ; close all open files
-;
-;  if not file-exists? "input data.csv" [
-;    user-message "No file 'input data.csv' exists! Try pressing WRITE-TURTLES-TO-CSV."
-;    stop
-;  ]
-;
-;  file-open "input data.csv" ; open the file with the turtle data
-;
-;  ; We'll read all the data in a single loop
-;  while [ not file-at-end? ] [
-;    ; here the CSV extension grabs a single line and puts the read data in a list
-;    let data csv:from-row 2 file-read-line
-;    ; now we can use that list to create a turtle with the saved properties
-;    create-turtles 1 [
-;      set xcor    item 1 data
-;      set ycor    item 1 data
-;      set size    item 2 data
-;      set color   item 3 data
-;      set heading item 4 data
-;    ]
-;  ]
-;
-;  file-close ; make sure to close the file
-;end
-
-
-
-;to update-product-demand-history
-;  let current-demand company-demand
-;  set product-demand-history lput company-demand product-demand-history
-;end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;HOW SIMULATION WILL EVOLVE;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -254,43 +199,30 @@ end
 to go
   user-stock-consumption
   utility-function-management
-  user-stock-allocation ;da rivedere ma la teniamo
-  ;users-demand-allocation
-  ;discount ;the old "price-strategy"
-  reprocess ;the old "sustainability-strategy"
+  user-stock-allocation
+  reprocess
   tick
 end
 
 to user-stock-consumption
-  ask users [
-    set stock stock * (1 - c) + stock-input
+  ask users
+  [
+    set stock stock * (1 - c)
   ]
-
 end
 
 to-report safe-divide [numerator denominator]
-  if denominator = 0 [
+  if denominator = 0
+  [
     report 0
   ]
   report numerator / denominator
 end
 
-
 to utility-function-management
-
-  ; compute the maximum and minumum of price and sustainability for products
-  let max-sustainability max [ p-sustainability ] of products
-  let min-sustainability min [ p-sustainability ] of products
-  let max-price max [ p-price ] of products
-  let min-price min [ p-price ] of products
-  let max-quality max [ p-quality ] of products
-  let min-quality min [ p-quality ] of products
-  let max-acceptance max [ p-acceptance ] of products
-  let min-acceptance min [ p-acceptance ] of products
-
-
-  ; compute for each company the normalized score for price and sustainabilty
-  ask products [
+  ;compute for each company the normalized score for price and sustainabilty
+  ask products
+  [
     ifelse n-products = 1
     [
       set p-sustainability-norm p-sustainability
@@ -300,122 +232,95 @@ to utility-function-management
     ]
     ;else
     [
-     set p-sustainability-norm safe-divide (p-sustainability - min-sustainability) (max-sustainability - min-sustainability)
+      ; compute the maximum and minumum of price and sustainability for products
+      let max-sustainability max [ p-sustainability ] of products
+      let min-sustainability min [ p-sustainability ] of products
+      let max-price max [ p-price ] of products
+      let min-price min [ p-price ] of products
+      let max-quality max [ p-quality ] of products
+      let min-quality min [ p-quality ] of products
+      let max-acceptance max [ p-acceptance ] of products
+      let min-acceptance min [ p-acceptance ] of products
+
+      set p-sustainability-norm safe-divide (p-sustainability - min-sustainability) (max-sustainability - min-sustainability)
       set p-price-norm safe-divide (p-price - min-price) (max-price - min-price)
       set p-quality-norm safe-divide (p-quality - min-quality) (max-quality - min-quality)
       set p-acceptance-norm safe-divide (p-acceptance - min-acceptance) (max-acceptance - min-acceptance)
-
     ]
-
   ]
-
-  ; find the best company according to each user preference
-  ask users [
-
+; find the best company according to each user preference
+ask users
+  [
     let my-beta beta ; sust-weight
     let my-gamma gamma ;price-weight
     let my-alpha alpha ; quality-weight
     let my-delta delta ; acceptance-weight
     let my-omega omega ; residual life-weight
 
-    let utilities []
-    let other_who []
+    let utilities-list []
+    let p-IDs-list []
 
-ask products[
+    ask products
+    [
+      set p-utility ( (p-quality-norm * my-alpha) + (p-sustainability-norm * my-beta) - (p-price-norm * my-gamma)) * (p-acceptance-norm * my-delta) * ((p-residual-life * my-omega) / p-shelf-life)
 
-    let utility-product random-float 5
-;    ( ([p-quality-norm] of best-product * my-alpha)
-;                 + ([ p-sustainability-norm ] of best-product * my-beta)
-;                 - ([ p-price-norm ] of best-product * my-gamma)
-;                )
-;              * ([p-acceptance-norm] of best-product * my-delta)
-;    * ([p-residual-life] of best-product * my-omega) / [p-shelf-life] of best-product
+      set utilities-list lput p-utility utilities-list
+      set p-IDs-list lput p-ID p-IDs-list
+    ]
 
-   set utilities lput utility-product utilities
-   set other_who lput p-ID other_who
-       ]
-
-    let max-utility max utilities
-    let index-score position max-utility utilities
-    let my-best-product item index-score other_who
+    let max-utility max utilities-list
+    let index-score position max-utility utilities-list
+    let my-best-product item index-score p-IDs-list
+    set utility-best-product max-utility
     set best-product my-best-product
-
-
-    ;set best-company [my-company] of best-product
+    set best-company [owner-ID] of best-product
  ]
 end
 
 to user-stock-allocation
-
-  ask users [
-    print  (word "User " who ", breed: " breed " utility: " utility)
-    ifelse (stock / stock-threshold) <= (utility * trigger) [
+ask users
+  [
+   if (stock / stock-threshold) <= (utility-best-product * trigger)
+    [
       set buy-bool True ; the user buys an item
       set stock stock + 1
-      set total-consumption count users with [ buy-bool]  ; Calculate total consumption
-
+      ask companies
+      [
+        set profit profit + ([p-price] of best-product - [p-production-cost] of best-product)
+      ]
     ]
-    [
-      set buy-bool False
-    ]
-
-;    ask companies [
-;      let n-buyers count users with [ best-company = myself and buy-bool ]
-;      set company-demand n-buyers
-;      set profit company-demand * (p-price - p-production-cost)
-;    ]
-  ]
-
-
-;  ask companies [
-;  ]
-;  ask users [
-;    set stock stock * (1 - c) + stock-input ;usury
-;    let ratio stock / old ; decision-making ratio
-;    ifelse ratio < max utility * trigger [
-;      set stock-input 1 ;
-;    ]
-;    [
-;      set stock-input 0
-;    ]
-;    set stock stock * (1 - c) + stock-input
-;  ]
+  set buy-bool false
+ ]
 end
 
-
-
 to reprocess
-
-  ask products with [ p-residual-life < threshold-2]
-  [
-
-    if any? products with [p-ID = 1]
-  [
+ask products with [ p-residual-life < threshold-2]
+ [
+   if any? products with [p-ID = 1]
+    [
       ask products with [p-ID = 1]
-   [
-      let p-amount-good p-amount
-      hatch 1
       [
-        ;esempio frutta matura-> macedonia
-    set p-name "higher value reprocess"
-    set p-amount p-amount-good * pct-1-hvr
-    set p-residual-life (1.1 * p-residual-life) ;fix
-    set p-price 1.1 * p-price ;fix
-    set p-sustainability 1.1 * p-sustainability; fix
-      ]
-  ];finish ask product 1
-    ]
+        hatch 1
+        [
+          ;Reprocess example: fruit and vegetables
+          set p-name "higher value reprocess"
+          set p-amount-hvr p-amount * pct-1-hvr
+          set p-residual-life (1.1 * p-residual-life)   ;fix
+          set p-price (1.1 * p-price)                     ;fix
+          set p-sustainability 1.1 * p-sustainability   ;fix
+        ]
+      ];finish ask product 1
+   ]
 
    if any? products with [p-ID = 2]
     [
     ask products with [p-ID = 2]
     [
-    let p-amount-good p-amount
       hatch 1
       [
         ;esempio frutta matura-> macedonia
     set p-name "same value reprocess"
-    set p-amount p-amount-good * pct-2-svr
+    set p-amount-svr p-amount * pct-2-svr
     set p-residual-life (1.1 * p-residual-life) ;fix
     set p-sustainability 1.1 * p-sustainability; fix
       ]
@@ -426,12 +331,12 @@ to reprocess
     [
     ask products with [p-ID = 3]
     [
-    let p-amount-good p-amount
+
       hatch 1
       [
         ;esempio frutta matura-> macedonia
     set p-name "lower value reprocess"
-    set p-amount p-amount-good * pct-3-lvr
+    set p-amount-lvr p-amount * pct-3-lvr
     set p-residual-life (1.1 * p-residual-life) ;fix
     set p-price 0.9 * p-price ;fix
     set p-sustainability 1.1 * p-sustainability; fix
@@ -443,13 +348,11 @@ to reprocess
   if any? remaining-products [
     ask remaining-products [
       ; Implement waste transformation logic here
-
-        let p-amount-good p-amount
       hatch 1
       [
         ;esempio waste
     set p-name "waste"
-    set p-amount p-amount-good * pct-4-w
+    set p-amount-w p-amount * pct-4-w
     set p-residual-life 0
     set p-price 0
           ;introdurre costo di smaltimento
@@ -461,27 +364,6 @@ to reprocess
 ]
 
 end
-
-;per VERSIONE successiva
-;to users-demand-allocation
-;  ;ask companies [ set company-demand 0 ]
-;  let companies-demand sum stock-input
-;end
-
-;to discount ; da inserire prima di reprocessing
-;  ask products [
-;    set p-residual-life p-residual-life - 1
-;  ]
-;
-;  ask companies [
-;    ask products [
-;      if (p-residual-life = threshold-1) [
-;        set p-price p-price * 0.9  ;FIX
-;        set p-quality p-quality * 0.9  ;FIX
-;      ]
-;    ]
-;  ]
-;end
 @#$#@#$#@
 GRAPHICS-WINDOW
 289
@@ -725,13 +607,12 @@ HORIZONTAL
 @#$#@#$#@
 ## COSA DEVI SISTEMARE?
 
+### TO BE DEFINED
+- verificare che la residual life venga decrementata ogni time step
+- inserire strategia di prezzo da attuare quando residual life < threshold-1
 
 ### Problemi da risolvere
 1. in questo modo la sostenibilità viene aumentata e arriva subito a 1
-
-
-
-
 
 
 ### 12/04/2024

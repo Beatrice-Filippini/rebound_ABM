@@ -4,7 +4,6 @@ extensions [csv]
 breed [users user]
 breed [companies company]
 breed [products product]
-undirected-link-breed [product-company-links product-company-link]
 
 ; Define product attributes
 products-own [
@@ -18,94 +17,57 @@ products-own [
   p-shelf-life
   p-residual-life
   p-production-cost
-  my-company
-  owner-id
+  owner-ID
 
+  ;used for utility calculations
   p-price-norm
   p-sustainability-norm
   p-quality-norm
   p-acceptance-norm
   p-residual-life-norm
 
-  p-amount ;serve per funzione hatch
+  ;used in the hatch function
+  p-amount
   pct-1-hvr
   pct-2-svr
   pct-3-lvr
   pct-4-w
-]
-; Define users attributes
+ ]
+
 users-own [
-  users-demand
   utility
-  sustainability-i
-  price-i
-  beta
-  gamma
-  alpha
-  delta
-  omega
+  beta         ;linked to sustainability
+  gamma        ;linked to price
+  alpha        ;linked to quality
+  delta        ;linked to acceptance
+  omega        ;linked to RL/SL
+
   stock
-  stock-input
-  trigger
+  stock-input  ;how many items the user buys at a given time
+  trigger      ;used to evaluate whether to buy
+  stock-threshold
+  c            ;stock consumption rate
 
-  ;temporary variables
-  best-company ;it is the i of max_i
-  buy-bool
-  total-consumption
-
+  best-company
   best-product
+  buy-bool
 ]
 
-; Define companies attributes
 companies-own [
   ;production-capability ;v0.4-> for now it is not a constrain
-  company-demand
-
+  company-demand     ;is used to calculate the company's profit
   profit
-  product-revenue
-  target-demand
-  target-price
-
-  ; temporary variables
-  temp-score ; a temporary value  to be used to make the decision for each user
-
-
-  ;v0.4-> variable added in this version
-  bool-decrease-price
-  bool-increase-price
-  bool-increase-sust
-  bool-decrease-sust
-  counter-decrease-price
-  counter-increase-price
-  counter-increase-sust
-  counter-decrease-sust
+  product-revenue    ;equal to p-price
 ]
 
-
-
-; Define global variables
 globals [
-  n ;number of companies
-  ;n-products
-  max-price-possibile
-  max-budget
-  target-demand-max
-  product-demand-history
-  c ;clothes consumption rate
-  stock-threshold
   max-init-stock
-  mean-trigger
- ;v0.4
-  price-period
-  sust-period
- ;v0.5
-  threshold-1
-  threshold-2
+  threshold-1    ;1/3 of shelf life
+  threshold-2    ;2/3 of shelf life
 ]
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;SETUP;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;List of  all the procedures that must be included in the setup process: they will be bettere defined below
@@ -113,34 +75,19 @@ to setup
   clear-all
   file-close-all
   init-globals
-
   create-world
   import-data
   create-agents
-
   reset-ticks
 end
 
-
-
 to init-globals ; NOTE: only here in the code i can have numbers because i'm setting the global variables
-  set n 10
-  set max-price-possibile 100
-  set max-budget 500
-  set target-demand-max 30
-
-  set product-demand-history []
-  set c 0.1 ; consumption rate of stock: CHECK for literature - for fashion ok around 2% vs for food a bit higher
-  set stock-threshold 20
-  set max-init-stock 10
-  set mean-trigger 100
-  set product-demand-history[]
-  set price-period 4 ;hp: i do not need a long period of time with sales<target in order to change the price (f.e. 4 weeks)
-  set sust-period 12 ;hp: before implementing changes in the sustainability practices, i need to observe low sales for a longer period of time (f.e. 3 months)
+  set max-init-stock 30
+  set threshold-1 (1 / 3) * p-shelf-life  ;here i can set it differently for the food vs fashion sector
+  set threshold-2 (2 / 3) * p-shelf-life
 end
 
 to create-world
-
   ask patches [ set pcolor white ]
 end
 
@@ -163,31 +110,25 @@ to import-data
     let p-shelf-lifes item 6 row
     let p-residual-lifes item 7 row
     let p-production-costs item 8 row
-    let my-companies item 9 row
+    let owner-ID item 9 row
 
       create-products 1 [
         set p-IDs p-id
         set p-names p-name
         set p-prices p-price
-        set p-sustainabilitys p-sustainability
-        set p-qualitys p-quality
+        set p-sustainabilities p-sustainability
+        set p-qualities p-quality
         set p-acceptances p-acceptance
-        set p-shelf-lifes p-shelf-life
-        set p-residual-lifes p-residual-life
+        set p-shelf-lives p-shelf-life
+        set p-residual-lives p-residual-life
         set p-production-costs p-production-cost
-        set my-companies my-company
+        set owner-IDs owner-ID
       ]
   ]
 end
 
 
 to create-agents
-
-
-
-
-
-
 
 
  create-products n-products [
@@ -209,8 +150,7 @@ to create-agents
       ;set p-production-cost 1 ;for now, the production cost is the same for each company
 
     ;v0.5
-  set threshold-1 (1 / 3) * p-shelf-life  ;here i can set it differently for the food vs fashion sector
-  set threshold-2 (2 / 3) * p-shelf-life
+
 
   ]
 create-users n-users[
@@ -232,6 +172,8 @@ create-users n-users[
     set omega random-float 1 ;residual-life
   ;print (word "Initial stock for user " who ": " stock "and" "max-init-stock: " max-init-stock)
 
+    set c 0.1 ; consumption rate of stock: CHECK for literature - for fashion ok around 2% vs for food a bit higher
+    set stock-threshold 20
      ]
 
 

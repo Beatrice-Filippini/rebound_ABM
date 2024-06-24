@@ -1,4 +1,4 @@
-p-ID,p-name,p-price,p-sustainability,p-quality,p-acceptance,p-shelf-life,p-residual-life,p-production-cost,my-company
+p-ID,p-name,p-price,p-sustainability,p-quality,p-acceptance,p-shelf-life,p-residual-life,p-production-cost,owner-ID
 1,Fresh fruits and vegetables,2,0.8,0,1,6,4,0.3,1
 2,Frozen food,7,0.2,0,1,300,299,4,2
 3,Sweets,5,0.5,0,1,20,15,1,1

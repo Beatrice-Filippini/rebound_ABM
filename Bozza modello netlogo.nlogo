@@ -98,45 +98,50 @@ to create-world
   ask patches [ set pcolor white ]
 end
 
-to import-data
-  clear-all
-  let data csv:from-file "C:\\Users\\beafi\\OneDrive - UNIVERSITA' CARLO CATTANEO - LIUC\\TESI\\Tesi Beatrice Filippini\\Modello NetLogo\\rebound_ABM\\Input data.csv"
-   set n-products (length data - 1) ; number of products is the number of rows minus header row
-  let header true
-  foreach data
-  [
-    row ->
-    if header
-    [
-    set header false
-    ]
-    let p-IDs item 0 row
-    let p-names item 1 row
-    let p-prices item 2 row
-    let p-sustainabilities item 3 row
-    let p-qualities item 4 row
-    let p-acceptances item 5 row
-    let p-shelf-lives item 6 row
-    let p-residual-lives item 7 row
-    let p-production-costs item 8 row
-    let owner-IDs item 9 row
-    let p-amounts item 10 row
 
-    create-products 1
-    [
-    set p-IDs p-id
-    set p-names p-name
-    set p-prices p-price
-    set p-sustainabilities p-sustainability
-    set p-qualities p-quality
-    set p-acceptances p-acceptance
-    set p-shelf-lives p-shelf-life
-    set p-residual-lives p-residual-life
-    set p-production-costs p-production-cost
-    set owner-IDs owner-ID
-    set p-amounts p-amount
-    ]
+to import-data
+  file-close-all
+  file-open "Input data.csv"
+  while [ not file-at-end? ]
+  [
+  let data csv:from-row file-read-line
+    ;"C:\\Users\\beafi\\OneDrive - UNIVERSITA' CARLO CATTANEO - LIUC\\TESI\\Tesi Beatrice Filippini\\Modello NetLogo\\rebound_ABM\\Input data.csv"
+   set n-products (length data - 1) ; number of products is the number of rows minus header row
+  ;let header true
+  ;foreach data
+  ;[
+       create-products 1
+      [
+      set p-ID item 0 data
+      set p-name item 1 data
+      set p-price item 2 data
+      set p-sustainability item 3 data
+      set p-quality item 4 data
+      set p-acceptance item 5 data
+      set p-shelf-life item 6 data
+      set p-residual-life item 7 data
+      set p-production-cost item 8 data
+      set owner-ID item 9 data
+      set p-amount item 10 data
+      ]
+
+;    create-products 1
+;    [
+;      set p-ID my-p-ID
+;        set p-name my-p-name
+;        set p-price my-p-price
+;        set p-sustainability my-p-sustainability
+;        set p-quality my-p-quality
+;        set p-acceptance my-p-acceptance
+;        set p-shelf-life my-p-shelf-life
+;        set p-residual-life my-p-residual-life
+;        set p-production-cost my-p-production-cost
+;        set owner-ID my-owner-ID
+;        set p-amount my-p-amount
+;    ]
+  ;]
   ]
+  file-close
 end
 
 to create-agents
@@ -188,8 +193,39 @@ create-companies n-companies
     set product-revenue 0
     set profit 0
   ]
-
 end
+
+;to import-data-from-lists
+;  let p-IDs [1 2 3 4]
+;  let p-names ["Fresh fruits and vegetables" "Frozen food" "Sweets" "Canned food"]
+;  let p-prices [2 7 5 3]
+;  let p-sustainabilities [0.8 0.2 0.5 0.3]
+;  let p-qualities [0 0 0 0]
+;  let p-acceptances [1 1 1 1]
+;  let p-shelf-lives [6 300 20 720]
+;  let p-residual-lives [4 299 15 717]
+;  let p-production-costs [0.3 4.0 1.0 2.0]
+;  let owner-IDs [1 2 1 3]
+;  let p-amounts [50 150 20 130]
+;
+;  foreach [p-IDs p-names p-prices p-sustainabilities p-qualities p-acceptances p-shelf-lives p-residual-lives p-production-costs owner-IDs p-amounts]
+;  [
+;    p-ID p-name p-price p-sustainability p-quality p-acceptance p-shelf-life p-residual-life p-production-cost owner-ID p-amount ->
+;    create-products 1 [
+;      set p-IDs p-ID
+;      set p-names p-name
+;      set p-prices p-price
+;      set p-sustainabilities p-sustainability
+;      set p-qualities p-quality
+;      set p-acceptances p-acceptance
+;      set p-shelf-lives p-shelf-life
+;      set p-residual-lives p-residual-life
+;      set p-production-costs p-production-cost
+;      set owner-IDs owner-ID
+;      set p-amounts p-amount
+;    ]
+;  ]
+;end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;HOW SIMULATION WILL EVOLVE;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -198,6 +234,7 @@ end
 ; How simulation will evolve
 to go
   user-stock-consumption
+  ;residual-life-consumption
   utility-function-management
   user-stock-allocation
   reprocess
@@ -210,6 +247,14 @@ to user-stock-consumption
     set stock stock * (1 - c)
   ]
 end
+
+;to residual-life-consumption
+;  ask products
+;  [
+;    set p-residual-life (p-residual-life - 1)
+;    print (word "prod name: " p-name " prod RL: " p-residual-life " prod SL: " p-shelf-life)
+;  ]
+;end
 
 to-report safe-divide [numerator denominator]
   if denominator = 0
@@ -293,6 +338,14 @@ ask users
  ]
 end
 
+to discount
+  ask products with [ p-residual-life < threshold-1]
+  [
+    set p-price 0.9 * p-price
+    ;CHECK when acceptance will be implemented, then it should be decreased here
+  ]
+end
+
 to reprocess
 ask products with [ p-residual-life < threshold-2]
  [
@@ -360,9 +413,7 @@ ask products with [ p-residual-life < threshold-2]
       ]
     ]
   ]
-
 ]
-
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -598,7 +649,7 @@ n-products
 n-products
 1
 20
-4.0
+10.0
 1
 1
 NIL

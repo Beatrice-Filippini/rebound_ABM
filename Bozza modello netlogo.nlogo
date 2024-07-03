@@ -28,15 +28,6 @@ products-own [
   p-residual-life-norm
   p-utility
 
-  ;used in the hatch function
-  p-amount-hvr
-  p-amount-svr
-  p-amount-lvr
-  p-amount-w
-  pct-1-hvr
-  pct-2-svr
-  pct-3-lvr
-  pct-4-w
  ]
 
 users-own [
@@ -68,6 +59,16 @@ globals [
   max-init-stock
   threshold-1    ;will be used for the reprocessing procedure
   threshold-2    ;will be used for the reduction of price
+
+  ;used in the hatch function
+  p-amount-hvr
+  p-amount-svr
+  p-amount-lvr
+  p-amount-w
+  pct-1-hvr
+  pct-2-svr
+  pct-3-lvr
+  pct-4-w
 ]
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -80,7 +81,7 @@ to setup
   file-close-all
   init-globals
   create-world
-  import-data
+  import-data-FB
   create-agents
   reset-ticks
 end
@@ -91,6 +92,15 @@ to init-globals ; NOTE: only here in the code i can have numbers because i'm set
   set max-init-stock 30
   set threshold-1 (1 / 3) * p-shelf-life  ;here i can set it differently for the food vs fashion sector
   set threshold-2 (2 / 3) * p-shelf-life
+  set pct-1-hvr 0.05
+  set pct-2-svr 0.1
+  set pct-3-lvr 0.15
+  set pct-4-w 0.2
+  set p-utility 0
+  set p-amount-hvr 0
+  set p-amount-svr 0
+  set p-amount-lvr 0
+  set p-amount-w 0
   ]
 end
 
@@ -98,50 +108,45 @@ to create-world
   ask patches [ set pcolor white ]
 end
 
+to import-data-FB
 
-to import-data
-  file-close-all
-  file-open "Input data.csv"
-  while [ not file-at-end? ]
-  [
-  let data csv:from-row file-read-line
-    ;"C:\\Users\\beafi\\OneDrive - UNIVERSITA' CARLO CATTANEO - LIUC\\TESI\\Tesi Beatrice Filippini\\Modello NetLogo\\rebound_ABM\\Input data.csv"
-   set n-products (length data - 1) ; number of products is the number of rows minus header row
-  ;let header true
-  ;foreach data
-  ;[
-       create-products 1
-      [
-      set p-ID item 0 data
-      set p-name item 1 data
-      set p-price item 2 data
-      set p-sustainability item 3 data
-      set p-quality item 4 data
-      set p-acceptance item 5 data
-      set p-shelf-life item 6 data
-      set p-residual-life item 7 data
-      set p-production-cost item 8 data
-      set owner-ID item 9 data
-      set p-amount item 10 data
+    file-close-all
+    file-open "Input data.csv"
+    let result csv:from-row file-read-line
+    while [ not file-at-end? ] [
+       let row csv:from-row file-read-line
+       create-products 1 [
+         set p-ID item 0 row
+         set p-name item 1 row
+         set p-price item 2 row
+         set p-sustainability item 3 row
+         set p-quality item 4 row
+         set p-acceptance item 5 row
+         set p-shelf-life item 6 row
+         set p-residual-life item 7 row
+         set p-production-cost item 8 row
+         set owner-ID item 9 row
+         set p-amount item 10 row
       ]
+    ]
+    file-close
+end
 
-;    create-products 1
-;    [
-;      set p-ID my-p-ID
-;        set p-name my-p-name
-;        set p-price my-p-price
-;        set p-sustainability my-p-sustainability
-;        set p-quality my-p-quality
-;        set p-acceptance my-p-acceptance
-;        set p-shelf-life my-p-shelf-life
-;        set p-residual-life my-p-residual-life
-;        set p-production-cost my-p-production-cost
-;        set owner-ID my-owner-ID
-;        set p-amount my-p-amount
-;    ]
-  ;]
-  ]
-  file-close
+to read_file_matrix
+    file-close-all
+    file-open "matrice prodotti.csv"
+    let result []
+    let i 0
+    while [ not file-at-end? ] [
+       let row csv:from-row file-read-line
+       set row but-first row
+       if i > 0 [ set result lput row result ]
+       set i i + 1
+    ]
+    print(result)
+    ;let pct-1-hvr 0.05
+
+    file-close
 end
 
 to create-agents
@@ -152,15 +157,6 @@ create-products n-products
     set ycor random-ycor
     set shape "box"
     set color red
-    set pct-1-hvr 0.05 ;FIX ask prof
-    set pct-2-svr 0.1
-    set pct-3-lvr 0.15
-    set pct-4-w 0.2
-    set p-utility 0
-    set p-amount-hvr 0
-    set p-amount-svr 0
-    set p-amount-lvr 0
-    set p-amount-w 0
   ]
 
 create-users n-users
@@ -195,38 +191,6 @@ create-companies n-companies
   ]
 end
 
-;to import-data-from-lists
-;  let p-IDs [1 2 3 4]
-;  let p-names ["Fresh fruits and vegetables" "Frozen food" "Sweets" "Canned food"]
-;  let p-prices [2 7 5 3]
-;  let p-sustainabilities [0.8 0.2 0.5 0.3]
-;  let p-qualities [0 0 0 0]
-;  let p-acceptances [1 1 1 1]
-;  let p-shelf-lives [6 300 20 720]
-;  let p-residual-lives [4 299 15 717]
-;  let p-production-costs [0.3 4.0 1.0 2.0]
-;  let owner-IDs [1 2 1 3]
-;  let p-amounts [50 150 20 130]
-;
-;  foreach [p-IDs p-names p-prices p-sustainabilities p-qualities p-acceptances p-shelf-lives p-residual-lives p-production-costs owner-IDs p-amounts]
-;  [
-;    p-ID p-name p-price p-sustainability p-quality p-acceptance p-shelf-life p-residual-life p-production-cost owner-ID p-amount ->
-;    create-products 1 [
-;      set p-IDs p-ID
-;      set p-names p-name
-;      set p-prices p-price
-;      set p-sustainabilities p-sustainability
-;      set p-qualities p-quality
-;      set p-acceptances p-acceptance
-;      set p-shelf-lives p-shelf-life
-;      set p-residual-lives p-residual-life
-;      set p-production-costs p-production-cost
-;      set owner-IDs owner-ID
-;      set p-amounts p-amount
-;    ]
-;  ]
-;end
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;HOW SIMULATION WILL EVOLVE;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -234,7 +198,7 @@ end
 ; How simulation will evolve
 to go
   user-stock-consumption
-  ;residual-life-consumption
+  residual-life-consumption
   utility-function-management
   user-stock-allocation
   reprocess
@@ -248,13 +212,13 @@ to user-stock-consumption
   ]
 end
 
-;to residual-life-consumption
-;  ask products
-;  [
-;    set p-residual-life (p-residual-life - 1)
-;    print (word "prod name: " p-name " prod RL: " p-residual-life " prod SL: " p-shelf-life)
-;  ]
-;end
+to residual-life-consumption
+  ask products
+  [
+    set p-residual-life (p-residual-life - 1)
+    print (word "prod name: " p-name " prod RL: " p-residual-life " prod SL: " p-shelf-life)
+  ]
+end
 
 to-report safe-divide [numerator denominator]
   if denominator = 0
@@ -371,7 +335,7 @@ ask products with [ p-residual-life < threshold-2]
     [
       hatch 1
       [
-        ;esempio frutta matura-> macedonia
+        ;esempio frutta pollo-> macedonia
     set p-name "same value reprocess"
     set p-amount-svr p-amount * pct-2-svr
     set p-residual-life (1.1 * p-residual-life) ;fix
@@ -656,30 +620,22 @@ NIL
 HORIZONTAL
 
 @#$#@#$#@
-## COSA DEVI SISTEMARE?
+## COSA SISTEMARE?
 
 ### TO BE DEFINED
-- verificare che la residual life venga decrementata ogni time step
-- inserire strategia di prezzo da attuare quando residual life < threshold-1
+
+- controllare in qualche modo i prezzi 
 
 ### Problemi da risolvere
-1. in questo modo la sostenibilità viene aumentata e arriva subito a 1
+1. Aggiungere in file csv le variabili min e max (prezzo, sustainability, quality...etc)
+2. Aggiungere delle categorie di prodotti
+3. sistemare matrice con le percentuali giuste (da fare dopo aver aggiunto i prodotti)
+4. far generare alla compagnia dei prodotti nuovi con attributi che rientrino nei limiti settati
+5. extra modello (da fare per la tesi): disegnare grafo sulla base della matrice aggiornata
 
 
-### 12/04/2024
+n. in setup procedure - init- globals abbiamo inserito ask turtles altrimenti dava errore: ha senso?
 
-1. sistema il fatto che al crescere del prezzo il temp-score diminuisca
-2. inserisci una variabile profitto  dentro le aziende
-3. fare che la domanda e la sostenibilità in qualche modo siano cambiate dalle aziende per  ottimizzare il profitto (es: se sono sotto la media delle vendite, cambio a caso uno delle due)
-
-Importante da ricordare: se l'obiettivo è studiare l'effetto rebound, a un certo punto bisognerà inserire che la domanda dei gruppi cambia con la sostenibilità e aumenta, e anche inserire dentro il consumo di CO2 o simili in modo esplicito
-
-
-## CHE COSA HO FATTO
-
-1. ho implementato un sistema tale per cui viene dato assegnato uno score a prezzo e sostenibilità che poi vengono moltiplicati per il peso che  ogni gruppo da a prezzo e sostenibilità
-2. inserisci una variabile profitto  dentro le aziende
-3. fare che la domanda e la sostenibilità in qualche modo siano cambiate dalle aziende per  ottimizzare il profitto (es: se sono sotto la media delle vendite, cambio il prezzo)
 
 
 ## WHAT IS IT?

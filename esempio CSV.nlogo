@@ -14,19 +14,28 @@ end
 
 to read_file_matrix
     file-close-all
-    file-open "matrice prodotti.csv"
-    let result []
+    file-open "matrice prodotti_value reprocess.csv"
+    let matrix []
     let i 0
     while [ not file-at-end? ] [
        let row csv:from-row file-read-line
        set row but-first row
-       if i > 0 [ set result lput row result ]
+       if i > 0 [ set matrix lput row matrix ]
        set i i + 1
     ]
-    print(result)
-    let due_tre item 3 (item 2 result)
+  set matrix matrix
+    print(matrix)
+    let due_tre item 3 (item 2 matrix) ;3 colonna, 2 riga
     print(due_tre)
     file-close
+end
+
+to somma-prodotto
+while item 1 (item row matrix) ;fino a quando ho l'item 1 (hvr) di qualsiasi riga
+[
+
+  p-amount-hvr
+]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW

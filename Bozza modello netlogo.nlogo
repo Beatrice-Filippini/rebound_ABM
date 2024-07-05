@@ -19,6 +19,18 @@ products-own [
   p-production-cost
   owner-ID
   p-amount
+  p-price-min
+  p-price-max
+  p-sustainability-min
+  p-sustainability-max
+  p-quality-min
+  p-quality-max
+  p-acceptance-min
+  p-acceptance-max
+  p-shelf-life-min
+  p-shelf-life-max
+  p-residual-life-min
+  p-residual-life-max
 
   ;used for utility calculations
   p-price-norm
@@ -109,7 +121,6 @@ to create-world
 end
 
 to import-data-FB
-
     file-close-all
     file-open "Input data.csv"
     let result csv:from-row file-read-line
@@ -127,6 +138,18 @@ to import-data-FB
          set p-production-cost item 8 row
          set owner-ID item 9 row
          set p-amount item 10 row
+         set p-price-min item 11 row
+         set p-price-max item 12 row
+         set p-sustainability-min item 13 row
+         set p-sustainability-max item 14 row
+         set p-quality-min item 15 row
+         set p-quality-max item 16 row
+         set p-acceptance-min item 17 row
+         set p-acceptance-max item 18 row
+         set p-shelf-life-min item 19 row
+         set p-shelf-life-max item 20 row
+         set p-residual-life-min item 21 row
+         set p-residual-life-max item 22 row
       ]
     ]
     file-close
@@ -135,16 +158,15 @@ end
 to read_file_matrix
     file-close-all
     file-open "matrice prodotti.csv"
-    let result []
+    let matrix []
     let i 0
     while [ not file-at-end? ] [
        let row csv:from-row file-read-line
        set row but-first row
-       if i > 0 [ set result lput row result ]
+       if i > 0 [ set matrix lput row matrix ]
        set i i + 1
     ]
-    print(result)
-    ;let pct-1-hvr 0.05
+    print(matrix)
 
     file-close
 end
@@ -216,7 +238,7 @@ to residual-life-consumption
   ask products
   [
     set p-residual-life (p-residual-life - 1)
-    print (word "prod name: " p-name " prod RL: " p-residual-life " prod SL: " p-shelf-life)
+    ;print (word "prod name: " p-name " prod RL: " p-residual-life " prod SL: " p-shelf-life)
   ]
 end
 
@@ -627,15 +649,18 @@ HORIZONTAL
 - controllare in qualche modo i prezzi 
 
 ### Problemi da risolvere
-1. Aggiungere in file csv le variabili min e max (prezzo, sustainability, quality...etc)
-2. Aggiungere delle categorie di prodotti
-3. sistemare matrice con le percentuali giuste (da fare dopo aver aggiunto i prodotti)
+
 4. far generare alla compagnia dei prodotti nuovi con attributi che rientrino nei limiti settati
 5. extra modello (da fare per la tesi): disegnare grafo sulla base della matrice aggiornata
 
 
 n. in setup procedure - init- globals abbiamo inserito ask turtles altrimenti dava errore: ha senso?
 
+
+### problemi risolti
+1. Aggiungere in file csv le variabili min e max (prezzo, sustainability, quality...etc)
+2. Aggiungere delle categorie di prodotti
+3. sistemare matrice con le percentuali giuste (da fare dopo aver aggiunto i prodotti)
 
 
 ## WHAT IS IT?

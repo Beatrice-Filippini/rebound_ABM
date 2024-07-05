@@ -1,0 +1,9 @@
+name,Waste,Hvr,Svr,Lvr
+Waste,0,0,0,0,0
+Fresh fruits and vegetables,0.95,0.05,0,0
+Frozen Food,0.9,0,0,0.1
+Sweets,1,0,0,0
+Canned Food,1,0,0,0
+Meat,0.7,0,0.3,0
+Fish,0.7,0,0.3,0
+Pasta,0.2,0,0,0.8

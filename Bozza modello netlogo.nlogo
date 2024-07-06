@@ -1,6 +1,6 @@
 ;problems to be solved/adressed: look for CHECK or FIX
 
-extensions [csv]
+extensions [csv matrix]
 breed [users user]
 breed [companies company]
 breed [products product]
@@ -71,6 +71,7 @@ globals [
   max-init-stock
   threshold-1    ;will be used for the reprocessing procedure
   threshold-2    ;will be used for the reduction of price
+  m1
 
   ;used in the hatch function
   p-amount-hvr
@@ -94,6 +95,7 @@ to setup
   init-globals
   create-world
   import-data-FB
+  read-file-matrix
   create-agents
   reset-ticks
 end
@@ -155,19 +157,17 @@ to import-data-FB
     file-close
 end
 
-to read_file_matrix
+to read-file-matrix
     file-close-all
     file-open "matrice prodotti.csv"
-    let matrix []
+    set m1 []
     let i 0
     while [ not file-at-end? ] [
        let row csv:from-row file-read-line
        set row but-first row
-       if i > 0 [ set matrix lput row matrix ]
+       if i >= 0 [ set m1 lput row m1 ]
        set i i + 1
     ]
-    print(matrix)
-
     file-close
 end
 
@@ -278,6 +278,7 @@ to utility-function-management
       set p-quality-norm safe-divide (p-quality - min-quality) (max-quality - min-quality)
       set p-acceptance-norm safe-divide (p-acceptance - min-acceptance) (max-acceptance - min-acceptance)
     ]
+      print (p-shelf-life)
   ]
 ; find the best company according to each user preference
 ask users
@@ -332,74 +333,85 @@ to discount
   ]
 end
 
+
+
 to reprocess
-ask products with [ p-residual-life < threshold-2]
- [
-   if any? products with [p-ID = 1]
-    [
-      ask products with [p-ID = 1]
+  let dimensions matrix:dimensions m1
+  let num-rows first dimensions
+  let i 0 ;righe
+  let j 0 ;colonne
+  while [ i < num-rows ]
+  [
+      let p-name-in-matrix matrix:get m1 i j
+    ask products with [p-name = p-name-in-matrix]
       [
-        hatch 1
+      if (p-residual-life < threshold-2)
         [
-          ;Reprocess example: fruit and vegetables
-          set p-name "higher value reprocess"
-          set p-amount-hvr p-amount * pct-1-hvr
-          set p-residual-life (1.1 * p-residual-life)   ;fix
-          set p-price (1.1 * p-price)                     ;fix
-          set p-sustainability 1.1 * p-sustainability   ;fix
+        let p-hvr matrix:get m1 i (j + 2)
+          if (p-hvr > 0)
+          [
+             hatch 1
+            [
+              ;Reprocess example: fruit and vegetables
+              set p-name "higher value reprocess"
+              set p-amount-hvr p-amount * pct-1-hvr
+              set p-residual-life (1.1 * p-residual-life)   ;fix
+              set p-price (1.1 * p-price)                     ;fix
+              set p-sustainability 1.1 * p-sustainability   ;fix
+             ]
+            print (word "p-amount: " p-amount " p-amount-hvr: " p-amount-hvr " p-hvr: " p-hvr)
+            ; check: facciamo morire il prodotto vecchio
+          ];fine if p-hvr>0
+
+        let p-svr  matrix:get m1 i (j + 3)
+          if (p-svr > 0)
+          [
+           hatch 1
+            [
+              ;esempio pollo-> pollo congelato
+              set p-name "same value reprocess"
+              set p-amount-svr p-amount * pct-2-svr
+              set p-residual-life (1.1 * p-residual-life) ;fix
+              set p-sustainability 1.1 * p-sustainability; fix
+            ]
+            ; check: facciamo morire il prodotto vecchio
+          ];fine if p-svr>0
+
+         let p-lvr matrix:get m1 i (j + 4)
+         if (p-lvr > 0)
+          [
+          hatch 1
+            [
+              ;esempio pasta -> pasta con semola rimacinata
+              set p-name "lower value reprocess"
+              set p-amount-lvr p-amount * pct-3-lvr
+              set p-residual-life (1.1 * p-residual-life) ;fix
+              set p-price 0.9 * p-price ;fix
+              set p-sustainability 1.1 * p-sustainability; fix
+            ]
+            ;check: facciamo morire il prodotto vecchio
+          ]; fine if p-lvr>0
+
+          let p-waste matrix:get m1  i (j + 1)
+          if (p-waste > 0)
+          [
+          hatch 1
+            [
+              ;esempio waste
+              set p-name "waste"
+              set p-amount-w p-amount * pct-4-w
+              set p-residual-life 0
+              set p-price 0
+              ;introdurre costo di smaltimento
+              set p-sustainability 0; fix
+            ]
+          ];fine if p-waste
         ]
-      ];finish ask product 1
-   ]
-
-   if any? products with [p-ID = 2]
-    [
-    ask products with [p-ID = 2]
-    [
-      hatch 1
-      [
-        ;esempio frutta pollo-> macedonia
-    set p-name "same value reprocess"
-    set p-amount-svr p-amount * pct-2-svr
-    set p-residual-life (1.1 * p-residual-life) ;fix
-    set p-sustainability 1.1 * p-sustainability; fix
       ]
-    ];finish ask product 2
-    ]
-
-   if any? products with [p-ID = 3]
-    [
-    ask products with [p-ID = 3]
-    [
-
-      hatch 1
-      [
-        ;esempio frutta matura-> macedonia
-    set p-name "lower value reprocess"
-    set p-amount-lvr p-amount * pct-3-lvr
-    set p-residual-life (1.1 * p-residual-life) ;fix
-    set p-price 0.9 * p-price ;fix
-    set p-sustainability 1.1 * p-sustainability; fix
-      ]
-    ];finish ask product 3
-    ]
-
-  let remaining-products products with [self != product 1 and self != product 2 and self != product 3]
-  if any? remaining-products [
-    ask remaining-products [
-      ; Implement waste transformation logic here
-      hatch 1
-      [
-        ;esempio waste
-    set p-name "waste"
-    set p-amount-w p-amount * pct-4-w
-    set p-residual-life 0
-    set p-price 0
-          ;introdurre costo di smaltimento
-    set p-sustainability 0; fix
-      ]
-    ]
+      ;fine ask product
+    set i i + 1
   ]
-]
+
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -625,21 +637,6 @@ true
 "" ""
 PENS
 "default" 1.0 2 -2674135 false "" "plotxy mean [p-sustainability] of companies count users with [ buy-bool ]"
-
-SLIDER
-18
-187
-190
-220
-n-products
-n-products
-1
-20
-10.0
-1
-1
-NIL
-HORIZONTAL
 
 @#$#@#$#@
 ## COSA SISTEMARE?

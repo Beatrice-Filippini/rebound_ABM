@@ -7,7 +7,7 @@ to read_file
     while [ not file-at-end? ] [
        let row csv:from-row file-read-line
        print(row)
-       print(item 3 row + 1)
+       print(item 3 row )
     ]
     file-close
 end
@@ -30,13 +30,6 @@ to read_file_matrix
     file-close
 end
 
-to somma-prodotto
-while item 1 (item row matrix) ;fino a quando ho l'item 1 (hvr) di qualsiasi riga
-[
-
-  p-amount-hvr
-]
-end
 @#$#@#$#@
 GRAPHICS-WINDOW
 210

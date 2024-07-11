@@ -176,16 +176,18 @@ end
 to read-file-matrix
     file-close-all
     file-open "matrice prodotti.csv"
-    set m1 []
+    let m1-list []
     let i 0
     while [ not file-at-end? ] [
        let row csv:from-row file-read-line
        set row but-first row
-       if i >= 0 [ set m1 lput row m1 ]
+       if i >= 0 [ set m1-list lput row m1-list ]
        set i i + 1
     ]
     file-close
+  set m1 matrix:from-row-list m1-list
 end
+
 
 to create-agents
 
@@ -388,6 +390,7 @@ to discount
     ;CHECK when acceptance will be implemented, then it should be decreased here
   ]
 end
+
 
 
 

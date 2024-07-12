@@ -121,7 +121,6 @@ to init-globals ; NOTE: only here in the code i can have numbers because i'm set
 ;  set p-amount-lvr 0
 ;  set p-amount-w 0
   set users-list []
-    print (word "users-list: "  users-list)
   set best-products-list []
   set best-companies-list []
   set p-net-revenues-list []
@@ -180,15 +179,12 @@ to read-file-matrix
     let i 0
     while [ not file-at-end? ] [
        let row csv:from-row file-read-line
-       set row  row
-       if i > 0 [ set m1 lput row m1]
+       set row but-first row
+       if i >= 0 [ set m1 lput row m1 ]
        set i i + 1
     ]
     file-close
-
-  print m1
 end
-
 
 to create-agents
 
@@ -199,7 +195,6 @@ create-users n-users
     set shape "person"
     set color blue
     set utility-best-product 0
-    set best-company 0
     set beta random-float 1  ;sustainability
     set gamma random-float 1 ;price
     set alpha random-float 1 ;quality
@@ -220,7 +215,6 @@ create-companies n-companies
     set shape "factory"
     set company-demand 0
     set earnings 0
-    set c-ID 1
   ]
 end
 
@@ -230,265 +224,19 @@ end
 
 ; How simulation will evolve
 to go
-  initialize-lists
   user-stock-consumption
-  residual-life-consumption
-  utility-function-management
-  user-stock-allocation
-  reprocess
   tick
-end
-
-to initialize-lists
-  set users-list []
-  set best-products-list []
-  set best-companies-list []
-  set p-net-revenues-list []
 end
 
 to user-stock-consumption
   ask users
   [
+  set users-list [1 2 3 4 5]
+
+
     set stock stock * (1 - c)
   ]
-end
-
-to residual-life-consumption
-  ask products
-  [
-    set p-residual-life (p-residual-life - 1)
-    ;print (word "prod name: " p-name " prod RL: " p-residual-life " prod SL: " p-shelf-life)
-  ]
-end
-
-to-report safe-divide [numerator denominator]
-  if denominator = 0
-  [
-    report 0
-  ]
-  report numerator / denominator
-end
-
-to utility-function-management
-  ;compute for each company the normalized score for price and sustainabilty
-  ask products
-  [
-    ifelse n-products = 1
-    [
-      set p-sustainability-norm p-sustainability
-      set p-price-norm p-price
-      set p-quality-norm p-quality
-      set p-acceptance-norm p-acceptance
-    ]
-    ;else
-    [
-      ; compute the maximum and minumum of price and sustainability for products
-      let max-sustainability max [ p-sustainability ] of products
-      let min-sustainability min [ p-sustainability ] of products
-      let max-price max [ p-price ] of products
-      let min-price min [ p-price ] of products
-      let max-quality max [ p-quality ] of products
-      let min-quality min [ p-quality ] of products
-      let max-acceptance max [ p-acceptance ] of products
-      let min-acceptance min [ p-acceptance ] of products
-
-      set p-sustainability-norm safe-divide (p-sustainability - min-sustainability) (max-sustainability - min-sustainability)
-      set p-price-norm safe-divide (p-price - min-price) (max-price - min-price)
-      set p-quality-norm safe-divide (p-quality - min-quality) (max-quality - min-quality)
-      set p-acceptance-norm safe-divide (p-acceptance - min-acceptance) (max-acceptance - min-acceptance)
-    ]
-      ;print (p-shelf-life)
-  ]
-; find the best company according to each user preference
-ask users
-  [
-    let my-beta beta ; sust-weight
-    let my-gamma gamma ;price-weight
-    let my-alpha alpha ; quality-weight
-    let my-delta delta ; acceptance-weight
-    let my-omega omega ; residual life-weight
-
-    let utilities-list []
-    let p-IDs-list []
-
-
-    ask products
-    [
-      set p-utility ( (p-quality-norm * my-alpha) + (p-sustainability-norm * my-beta) - (p-price-norm * my-gamma)) * (p-acceptance-norm * my-delta) * ((p-residual-life * my-omega) / p-shelf-life)
-
-      set utilities-list lput p-utility utilities-list
-      set p-IDs-list lput p-ID p-IDs-list
-    ]
-
-    let max-utility max utilities-list
-    let index-score position max-utility utilities-list
-    let my-best-product item index-score p-IDs-list   ;returns a p-ID
-    set utility-best-product max-utility
-
-    set best-company [owner-ID] of one-of products with [p-ID = my-best-product]
-    set users-list lput who users-list
-    set best-products-list lput my-best-product best-products-list
-    set best-companies-list lput best-company best-companies-list
-    ;print (word "users-list: " users-list word " best-products-list: " best-products-list word " best-companies-list: " best-companies-list word " best-company: "best-company)
-    ask products
-    [
-      set p-net-revenues-list lput ( ( [p-price] of one-of products with [p-ID = last best-products-list]) - ([p-production-cost] of one-of products with [p-ID = last best-products-list])) p-net-revenues-list
-    ]
-
-
-   if (stock / stock-threshold) <= (utility-best-product * trigger)
-    [
-      set buy-bool True ; the user buys an item
-      set stock stock + 1
-      let index-user position who users-list
-      let index-company index-user
-      let my-best-company item index-company best-companies-list
-
-      ask companies with [c-ID = my-best-company]
-      [
-        let index-net-revenue index-user
-        let p-net-revenue item index-net-revenue p-net-revenues-list
-        set earnings earnings + p-net-revenue
-      ]
-
-  set buy-bool false
- ]
-
-
-;    ask companies with [c-ID = best-company ]
-;    [
-;        set p-net-revenue ([p-price] of utility-best-product - [p-production-cost] of products with [p-ID  = utility-best-product])
-;        set earnings earnings + p-net-revenue
-;    ]
- ]
-end
-
-to user-stock-allocation
-;ask users
-;  [
-;   if (stock / stock-threshold) <= (utility-best-product * trigger)
-;    [
-;      set buy-bool True ; the user buys an item
-;      set stock stock + 1
-;      let index-user position who users-list
-;
-;        ask companies with [c-ID = best-company ]
-;      [
-;        let index-net-revenue index-user
-;        let p-net-revenue item index-net-revenue p-net-revenues-list
-;        set earnings earnings + p-net-revenue
-;      ]
-;
-;  set buy-bool false
-; ]
-;  ]
-end
-
-to discount
-  ask products with [ p-residual-life < threshold-1]
-  [
-    set p-price 0.9 * p-price
-    ;CHECK when acceptance will be implemented, then it should be decreased here
-  ]
-end
-
-
-
-
-to reprocess
-  let num-rows length  m1
-  let num-columns length first m1
- ;print (word "numero righe: " num-rows word " numero colonne: " num-columns)
-
-  let i 0 ;righe
-  let j 1 ;colonne
-
-  while [ i < num-rows ]
-  [
-    let p-name-in-matrix item i item j m1
-
-    ask products with [p-name = p-name-in-matrix]; and p-residual-life < threshold-2 ]
-      [
-      if (p-residual-life < threshold-2)
-        [
-
-          set j j + 1 ;j=1
-
-          let p-waste item i item j m1
-          print p-waste
-
-          if (p-waste > 0)
-          [
-          hatch 1
-            [
-              ;esempio waste
-              set p-name "waste"
-              set p-amount-w p-amount * pct-4-w
-              set p-residual-life 0
-              set p-price 0
-              ;introdurre costo di smaltimento
-              set p-sustainability 0; fix
-            ]
-            set p-amount p-amount - p-amount-w
-          ];fine if p-waste
-
-          set j j + 1 ;j=2
-
-          let p-hvr matrix:get m1 i j
-          if (p-hvr > 0)
-          [
-             hatch 1
-            [
-              ;Reprocess example: fruit and vegetables
-              set p-name "higher value reprocess"
-              set p-amount-hvr p-amount * pct-1-hvr
-              set p-residual-life (1.1 * p-residual-life)   ;fix
-              set p-price (1.1 * p-price)                     ;fix
-              set p-sustainability 1.1 * p-sustainability   ;fix
-             ]
-            ;print (word "p-amount: " p-amount " p-amount-hvr: " p-amount-hvr " p-hvr: " p-hvr)
-           set p-amount p-amount - p-amount-hvr
-          ];fine if p-hvr>0
-
-        set j j + 1
-
-        let p-svr  matrix:get m1 i j
-          if (p-svr > 0)
-          [
-           hatch 1
-            [
-              ;esempio pollo-> pollo congelato
-              set p-name "same value reprocess"
-              set p-amount-svr p-amount * pct-2-svr
-              set p-residual-life (1.1 * p-residual-life) ;fix
-              set p-sustainability 1.1 * p-sustainability; fix
-            ]
-            set p-amount p-amount - p-amount-svr
-          ];fine if p-svr>0
-
-         set j j + 1
-
-         let p-lvr matrix:get m1 i j
-         if (p-lvr > 0)
-          [
-          hatch 1
-            [
-              ;esempio pasta -> pasta con semola rimacinata
-              set p-name "lower value reprocess"
-              set p-amount-lvr p-amount * pct-3-lvr
-              set p-residual-life (1.1 * p-residual-life) ;fix
-              set p-price 0.9 * p-price ;fix
-              set p-sustainability 1.1 * p-sustainability; fix
-            ]
-            set p-amount p-amount - p-amount-lvr
-          ]; fine if p-lvr>0
-
-        ]
-      ]
-      ;fine ask product
-    set i i + 1
-  ]
-
+  print (word "users-list: "  users-list word "ultimo valore" last users-list)
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -730,6 +478,23 @@ n-products
 NIL
 HORIZONTAL
 
+BUTTON
+47
+29
+158
+62
+NIL
+import-data-FB
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
 @#$#@#$#@
 ## COSA SISTEMARE?
 
@@ -737,7 +502,7 @@ HORIZONTAL
 
 - inserire dati companies da csv
 - controllare che le variabili importate da csv vengano assegnate correttamente ai prodotti
-
+- capire come gestire il profitto: entrano in gioco variabili user-owned, product-owned e company-owned 
 
 ### Problemi da risolvere
 
@@ -752,7 +517,6 @@ n. in setup procedure - init- globals abbiamo inserito ask turtles altrimenti da
 1. Aggiungere in file csv le variabili min e max (prezzo, sustainability, quality...etc)
 2. Aggiungere delle categorie di prodotti
 3. sistemare matrice con le percentuali giuste (da fare dopo aver aggiunto i prodotti)
-- capire come gestire il profitto: entrano in gioco variabili user-owned, product-owned e company-owned 
 
 
 ## WHAT IS IT?

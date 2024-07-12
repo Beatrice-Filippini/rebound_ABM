@@ -1,35 +1,61 @@
-extensions [csv]
+extensions [csv matrix]
 
-to read_file
-    file-close-all
-    file-open "Input data.csv"
-    let result csv:from-row file-read-line
-    while [ not file-at-end? ] [
-       let row csv:from-row file-read-line
-       print(row)
-       print(item 3 row )
-    ]
-    file-close
-end
+;to read_file
+;    file-close-all
+;    file-open "Input data.csv"
+;    let result csv:from-row file-read-line
+;    while [ not file-at-end? ] [
+;       let row csv:from-row file-read-line
+;       print(row)
+;       print(item 3 row )
+;    ]
+;    file-close
+;end
 
-to read_file_matrix
+;to read_file_matrix
+;    file-close-all
+;    file-open "matrice prodotti_value reprocess.csv"
+;    let matrix []
+;    let i 0
+;    while [ not file-at-end? ] [
+;       let row csv:from-row file-read-line
+;       set row but-first row
+;       if i > 0 [ set matrix lput row matrix ]
+;       set i i + 1
+;    ]
+;  set matrix matrix
+;    print(matrix)
+;    let due_tre item 3 (item 2 matrix) ;3 colonna, 2 riga
+;    print(due_tre)
+;    file-close
+;end
+
+
+globals [m1 num-rows num-columns]
+
+to read-file-matrix
     file-close-all
-    file-open "matrice prodotti_value reprocess.csv"
-    let matrix []
+    file-open "matrice prodotti.csv"
+    set m1 []
     let i 0
     while [ not file-at-end? ] [
        let row csv:from-row file-read-line
        set row but-first row
-       if i > 0 [ set matrix lput row matrix ]
+       if i >= 0 [ set m1 lput row m1 ]
        set i i + 1
     ]
-  set matrix matrix
-    print(matrix)
-    let due_tre item 3 (item 2 matrix) ;3 colonna, 2 riga
-    print(due_tre)
     file-close
+  print m1
 end
 
+
+to reprocess
+  set num-rows length first m1
+  set num-columns length  m1
+  print  m1
+  ;print (word "numero righe: " num-rows word " numero colonne: " num-columns)
+
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -59,12 +85,12 @@ ticks
 30.0
 
 BUTTON
-48
-40
-126
-73
+36
+220
+153
+253
 NIL
-read_file
+read-file-matrix
 NIL
 1
 T
@@ -76,12 +102,12 @@ NIL
 1
 
 BUTTON
-36
-220
-153
-253
+49
+281
+132
+314
 NIL
-read_file_matrix
+reprocess
 NIL
 1
 T

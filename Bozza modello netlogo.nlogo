@@ -55,7 +55,7 @@ users-own
   stock-threshold
   c            ;stock consumption rate
 
-  best-company
+  ;best-company
   utility-of-best-product
   buy-bool
 ]
@@ -69,8 +69,8 @@ companies-own [
 
 globals [
   max-init-stock
-  threshold-1    ;will be used for the reprocessing procedure
-  threshold-2    ;will be used for the reduction of price
+  threshold-1    ;will be used for the reduction of price
+  threshold-2    ;will be used for the reprocessing procedure
   m1             ;matrix
   users-list
   best-products-list    ;global list which saves the p-ID of the best product chosen by each user
@@ -112,8 +112,8 @@ to init-globals ; NOTE: only here in the code i can have numbers because i'm set
   set threshold-2 (1 / 3)
   set m1 []
   set users-list []
-;  set best-products-list []
-;  set best-companies-list []
+  set best-products-list []
+  set best-companies-list []
   set p-net-revenues-list []
 
   set p-amount-hvr 0
@@ -191,7 +191,7 @@ create-users n-users
     set shape "person"
     set color blue
     set utility-of-best-product 0
-    set best-company 0
+    ;set best-company 0
     set beta random-float 1  ;sustainability
     set gamma random-float 1 ;price
     set alpha random-float 1 ;quality
@@ -299,8 +299,7 @@ ask users
 
     let utilities-list []
     let p-IDs-list []
-    ;let best-products-list []
-    ;let best-companies-list []
+
 
     ask products
     [
@@ -308,6 +307,7 @@ ask users
 
       set utilities-list lput p-utility utilities-list
       set p-IDs-list lput p-ID p-IDs-list
+      ;print (word "Prodotto ID: " p-ID " Utilità: " p-utility)
     ]
 
     let max-utility max utilities-list
@@ -315,11 +315,12 @@ ask users
     let my-best-product item index-score p-IDs-list   ;returns a p-ID
     set utility-of-best-product max-utility
 
-    set best-company ([owner-ID] of one-of products with [p-ID = my-best-product])
+    let best-company ([owner-ID] of one-of products with [p-ID = my-best-product])
     set users-list lput who users-list
     set best-products-list lput my-best-product best-products-list
     set best-companies-list lput best-company best-companies-list
-    print (word "users-list: " users-list word " best-products-list: " best-products-list word " best-companies-list: " best-companies-list word " best-company: "best-company)
+
+    print (word "my BP: " my-best-product word "users-list: " users-list word " best-products-list: " best-products-list word " best-companies-list: " best-companies-list word " best-company: " best-company)
     ask products
     [
       set p-net-revenues-list lput ( ( [p-price] of one-of products with [p-ID = last best-products-list]) - ([p-production-cost] of one-of products with [p-ID = last best-products-list])) p-net-revenues-list
@@ -338,7 +339,8 @@ ask users
       set stock stock + 1
       let index-user position who users-list
       let index-company index-user
-      let my-best-company item index-company best-companies-list
+      ;let my-best-company item index-company best-companies-list ;FIX: in teoria linea concenttualmente corretta
+      let my-best-company last best-companies-list
 
       ask companies with [c-ID = my-best-company]
       [
@@ -347,9 +349,12 @@ ask users
         set earnings earnings + p-net-revenue
       ]
 
-  set buy-bool false
+  ;set buy-bool false
  ]
  ]
+     set best-products-list []
+    set best-companies-list []
+
 end
 
 to discount
@@ -359,8 +364,6 @@ to discount
     ;CHECK when acceptance will be implemented, then it should be decreased here
   ]
 end
-
-
 
 
 to reprocess
@@ -563,33 +566,33 @@ HORIZONTAL
 
 MONITOR
 1005
-76
+24
 1103
-137
+85
 Mean price
-precision mean ( [p-price] of companies ) 2
-17
-1
-15
-
-MONITOR
-1003
-162
-1161
-223
-Mean sustainability
-precision mean [ p-sustainability ] of companies  2
+precision mean ( [p-price] of products ) 2
 17
 1
 15
 
 MONITOR
 1005
-244
-1200
-305
+111
+1163
+172
+Mean sustainability
+precision mean [ p-sustainability ] of products  2
+17
+1
+15
+
+MONITOR
+1007
+193
+1181
+254
 Mean Stock of Products
-mean [ stock ] of users
+precision mean [ stock ] of users 2
 17
 1
 15
@@ -648,53 +651,6 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot mean [ stock ] of users"
 
 MONITOR
-1023
-370
-1236
-431
-Avg product Sustainability
-precision mean [p-sustainability] of companies 4
-17
-1
-15
-
-PLOT
-59
-374
-334
-586
-Relationship price-sustainability
-product-sustainability
-product-price
-0.0
-1.0
-0.0
-1.0
-true
-true
-"" ""
-PENS
-"default" 1.0 0 -16777216 false "" "plotxy mean [p-sustainability] mean [p-price ]"
-
-PLOT
-588
-368
-1011
-603
-Relationship sustainability-consumption
-product-sustainability
-n-products-bought
-0.5
-1.0
-0.0
-10.0
-true
-true
-"" ""
-PENS
-"default" 1.0 2 -2674135 false "" "plotxy mean [p-sustainability] of companies count users with [ buy-bool ]"
-
-MONITOR
 16
 188
 191
@@ -705,10 +661,21 @@ n-products
 1
 15
 
+MONITOR
+1015
+275
+1086
+320
+Max stock
+max [stock] of users
+17
+1
+11
+
 @#$#@#$#@
 ## COSA SISTEMARE?
 
-### TO BE DEFINED
+### FUTURE IMPLEMENTATION
 
 - inserire dati companies da csv
 - controllare che le variabili importate da csv vengano assegnate correttamente ai prodotti

@@ -1,0 +1,50 @@
+
+to discount
+  ask products with [ p-residual-life <= (threshold-1 * p-shelf-life)]
+  [
+    set p-price 0.9 * p-price
+    ;CHECK when acceptance will be implemented, then it should be decreased here
+  ]
+end
+
+
+
+
+
+;       create-products 1 [
+;         set xcor random-xcor
+;         set ycor random-ycor
+;         set shape "box"
+;         set color orange
+;         set p-ID item 0 row
+;         set p-name item 1 row
+;         set p-price item 2 row
+;         set p-sustainability item 3 row
+;         set p-quality item 4 row
+;         set p-acceptance item 5 row
+;         set p-shelf-life item 6 row
+;         set p-residual-life item 7 row
+;         set p-production-cost item 8 row
+;         set owner-ID item 9 row
+;         set p-amount item 10 row
+;         set p-price-min item 11 row
+;         set p-price-max item 12 row
+;         set p-sustainability-min item 13 row
+;         set p-sustainability-max item 14 row
+;         set p-quality-min item 15 row
+;         set p-quality-max item 16 row
+;         set p-acceptance-min item 17 row
+;         set p-acceptance-max item 18 row
+;         set p-shelf-life-min item 19 row
+;         set p-shelf-life-max item 20 row
+;         set p-residual-life-min item 21 row
+;         set p-residual-life-max item 22 row
+;         set p-utility 0
+;      ]
+
+
+print ( list "*************" who "*************" )
+print list "min" item i p-price-min
+print list "max" item i p-price-max
+print list "price" [ c-price ] of my-company
+print p-price

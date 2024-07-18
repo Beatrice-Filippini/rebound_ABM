@@ -81,6 +81,9 @@ globals [
   n-products
   c-len-memory
 
+  ;reprocess procedure
+  ;n-products-to-transform
+
 
   ;used in the hatch function
   p-amount-hvr
@@ -141,6 +144,7 @@ to init-globals ; NOTE: only here in the code i can have numbers because i'm set
   set p-amount-w 0
 
   set c-len-memory 10
+  ;set n-products-to-transform 0
 end
 
 ;import data+ create the agent "product"
@@ -193,7 +197,7 @@ to read-file-matrix
     while [ not file-at-end? ] [
        let row csv:from-row file-read-line
        set row  row
-       if i > 0 [ set m1 lput row m1]
+       if i >= 0 [ set m1 lput row m1]
        set i i + 1
     ]
     file-close
@@ -325,7 +329,6 @@ to go
 
   ; then, the product
   residual-life-consumption
-  ;reprocess
 
   ; finally, the company
   demand-assessment
@@ -411,6 +414,8 @@ to utility-function-management
       ;print (word "Prodotto ID: " p-ID " Utilità: " p-utility)
     ]
 
+    if length utilities-list > 0
+    [
     let max-utility max utilities-list
     let index-score position max-utility utilities-list
     let my-best-product item index-score p-IDs-list   ;returns a p-ID
@@ -450,6 +455,7 @@ to utility-function-management
       set buy-bool false
     ]
  ]
+  ]
      set best-products-list []
     set best-companies-list []
 
@@ -467,114 +473,187 @@ to residual-life-consumption
   ]
 end
 
+;to reprocess
+;  let num-rows length  m1
+;  let num-columns length first m1
+; ;print (word "numero righe: " num-rows word " numero colonne: " num-columns)
+;
+;  let i 1 ;righe
+;  let j 0 ;colonne
+;          ;NB: per chiamare l'elemento i,j devo scrivere "item j item i m1"
+;
+;  while [ i < num-rows ]
+;  [
+;    let p-name-in-matrix item j item i m1
+;
+;
+;    ask products with [p-name = p-name-in-matrix and p-residual-life <= (threshold-2 * p-shelf-life)]
+;      [
+;          set j j + 1 ;j=1
+;
+;          let p-waste item j item i m1
+;          print ( word "p-waste" p-waste )
+;
+;          if (p-waste > 0)
+;          [
+;          hatch 1
+;            [
+;              ;esempio waste
+;              set p-name "waste"
+;              set p-ID "w"
+;              set p-amount-w p-amount * p-waste
+;              set p-residual-life 0
+;              set p-price 0
+;              ;introdurre costo di smaltimento
+;              set p-sustainability 0; fix
+;            ]
+;          ;set p-amount p-amount - p-amount-w      ;CHECK dopo qualche iterazione
+;          ];fine if p-waste
+;
+;        while [j > 1 and j < num-columns]
+;        [
+;          set j j + 1 ;j=2
+;          let cell-text item j item i m1
+;          let numeric-part read-from-string (first (word cell-text "_"))
+;          let text-part last (word cell-text "_")
+;
+;          if (numeric-part > 0)
+;          [
+;            if (text-part = "hvr")
+;               [
+;                  let p-hvr numeric-part
+;                  hatch 1
+;                  [
+;                    ;Reprocess example: fruit and vegetables
+;                    set p-name "higher value reprocess"
+;                    set p-ID "hvr"
+;                    set p-amount-hvr p-amount * p-hvr
+;                    set p-residual-life (1.1 * p-residual-life)     ;fix
+;                    set p-price (1.1 * p-price)                     ;fix
+;                    set p-sustainability 1.1 * p-sustainability     ;fix
+;                  ]
+;                  ;print (word "p-amount: " p-amount " p-amount-hvr: " p-amount-hvr " p-hvr: " p-hvr)
+;                  ;set p-amount p-amount - p-amount-hvr
+;               ]
+;
+;            if (text-part = "svr")
+;               [
+;                  let p-svr numeric-part
+;                  hatch 1
+;                  [
+;                    ;esempio pollo-> pollo congelato
+;                    set p-name "same value reprocess"
+;                    set p-ID "svr"
+;                    set p-amount-svr p-amount * p-svr
+;                    set p-residual-life (1.1 * p-residual-life)     ;fix
+;                    set p-sustainability (1.1 * p-sustainability)   ; fix
+;                  ]
+;                  ;set p-amount p-amount - p-amount-svr
+;               ]
+;
+;            if (text-part = "lvr")
+;               [
+;                  let p-lvr numeric-part
+;                  hatch 1
+;                  [
+;                    ;esempio pasta -> pasta con semola rimacinata
+;                    set p-name "lower value reprocess"
+;                    set p-ID "lvr"
+;                    set p-amount-lvr p-amount * p-lvr
+;                    set p-residual-life (1.1 * p-residual-life)     ;fix
+;                    set p-price 0.9 * p-price                       ;fix
+;                    set p-sustainability (1.1 * p-sustainability)   ;fix
+;                  ]
+;                  ;set p-amount p-amount - p-amount-lvr
+;               ]
+;          ]; end of if (numeric-part>0)
+;      ]; end of second while
+;
+;        set p-amount ( p-amount - p-amount-w - p-amount-hvr - p-amount-svr - p-amount-lvr)
+;
+;    ]; end of ask product
+;    set p-amount-w 0
+;    set p-amount-hvr 0
+;    set p-amount-svr 0
+;    set p-amount-lvr 0
+;    set i i + 1
+;    set j 0
+;  ]
+;
+;end
+
+
+;hypotesis: the whole  product is reprocessed or goes to waste
+
 to reprocess
   let num-rows length  m1
   let num-columns length first m1
  ;print (word "numero righe: " num-rows word " numero colonne: " num-columns)
 
-  let i 1 ;righe
+  let i 2 ;righe
   let j 0 ;colonne
           ;NB: per chiamare l'elemento i,j devo scrivere "item j item i m1"
 
   while [ i < num-rows ]
   [
-    let p-name-in-matrix item j item i m1
+    let p-name-to-be-transformed item j item i m1
 
-    ask products with [p-name = p-name-in-matrix and p-residual-life <= (threshold-2 * p-shelf-life)]
+    ask products with [p-name = p-name-to-be-transformed and p-residual-life <= (threshold-2 * p-shelf-life)]
       [
-          set j j + 1 ;j=1
+        set j j + 1 ;j=1
 
-          let p-waste item j item i m1
-          print ( word "p-waste" p-waste )
+        let p-waste item j item i m1
+        let n-products-to-transform (count products)
+        print ( word "n-products-to-transform" n-products-to-transform )
 
           if (p-waste > 0)
           [
-          hatch 1
+          let n-products-to-waste ceiling (n-products-to-transform * p-waste)
+          hatch n-products-to-transform
             [
               ;esempio waste
               set p-name "waste"
               set p-ID "w"
-              set p-amount-w p-amount * p-waste
+              set shape "triangle"
               set p-residual-life 0
               set p-price 0
               ;introdurre costo di smaltimento
               set p-sustainability 0; fix
             ]
-          ;set p-amount p-amount - p-amount-w      ;CHECK dopo qualche iterazione
-          ];fine if p-waste
+          let n-products-to-die n-products-to-transform - n-products-to-waste
+          ask n-of n-products-to-die products with [p-name = p-name-to-be-transformed] [die]
+        ]
 
         while [j > 1 and j < num-columns]
         [
           set j j + 1 ;j=2
-          let cell-text item j item i m1
-          let numeric-part read-from-string (first (word cell-text "_"))
-          let text-part last (word cell-text "_")
+          let percentual-reprocessing item j item i m1
 
-          if (numeric-part > 0)
+          if (percentual-reprocessing > 0)
           [
-            if (text-part = "hvr")
-               [
-                  let p-hvr numeric-part
-                  hatch 1
+            let n-products-to-reprocess floor (n-products-to-transform * percentual-reprocessing)
+                  hatch n-products-to-reprocess
                   [
                     ;Reprocess example: fruit and vegetables
-                    set p-name "higher value reprocess"
-                    set p-ID "hvr"
-                    set p-amount-hvr p-amount * p-hvr
-                    set p-residual-life (1.1 * p-residual-life)     ;fix
-                    set p-price (1.1 * p-price)                     ;fix
-                    set p-sustainability 1.1 * p-sustainability     ;fix
+                    set p-name (item j item 0 m1)
+                    set p-ID "reprocessed"
+                    set p-residual-life mean [p-residual-life] of products with [p-name = (item j item 0 m1)]
+                    set p-price mean [p-price] of products with [p-name = (item j item 0 m1)]
+                    set p-sustainability mean [p-sustainability] of products with [p-name = (item j item 0 m1)]
                   ]
-                  ;print (word "p-amount: " p-amount " p-amount-hvr: " p-amount-hvr " p-hvr: " p-hvr)
-                  ;set p-amount p-amount - p-amount-hvr
-               ]
+            let n-products-to-die n-products-to-transform - n-products-to-reprocess
+            ask n-of n-products-to-die products with [p-name = p-name-to-be-transformed] [die]
+            ;print (word "p-amount: " p-amount " p-amount-hvr: " p-amount-hvr " p-hvr: " p-hvr)
 
-            if (text-part = "svr")
-               [
-                  let p-svr numeric-part
-                  hatch 1
-                  [
-                    ;esempio pollo-> pollo congelato
-                    set p-name "same value reprocess"
-                    set p-ID "svr"
-                    set p-amount-svr p-amount * p-svr
-                    set p-residual-life (1.1 * p-residual-life)     ;fix
-                    set p-sustainability (1.1 * p-sustainability)   ; fix
-                  ]
-                  ;set p-amount p-amount - p-amount-svr
-               ]
+          ]
 
-            if (text-part = "lvr")
-               [
-                  let p-lvr numeric-part
-                  hatch 1
-                  [
-                    ;esempio pasta -> pasta con semola rimacinata
-                    set p-name "lower value reprocess"
-                    set p-ID "lvr"
-                    set p-amount-lvr p-amount * p-lvr
-                    set p-residual-life (1.1 * p-residual-life)     ;fix
-                    set p-price 0.9 * p-price                       ;fix
-                    set p-sustainability (1.1 * p-sustainability)   ;fix
-                  ]
-                  ;set p-amount p-amount - p-amount-lvr
-               ]
-          ]; end of if (numeric-part>0)
-      ]; end of second while
-
-        set p-amount ( p-amount - p-amount-w - p-amount-hvr - p-amount-svr - p-amount-lvr)
-
-    ]; end of ask product
-    set p-amount-w 0
-    set p-amount-hvr 0
-    set p-amount-svr 0
-    set p-amount-lvr 0
     set i i + 1
     set j 0
+        ]
+    ]
   ]
 
 end
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; COMPANY ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -823,6 +902,23 @@ max [stock] of users
 17
 1
 11
+
+BUTTON
+119
+413
+232
+446
+NIL
+reprocess
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## COSA SISTEMARE?
@@ -1227,7 +1323,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.3.0
+NetLogo 6.4.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

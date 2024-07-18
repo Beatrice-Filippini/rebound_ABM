@@ -1,44 +1,105 @@
-extensions [csv matrix]
-
-globals [m1]
-
-to read-file-matrix
-    file-close-all
-    file-open "matrice prodotti.csv"
-    set m1 []
-    let i 0
-    while [ not file-at-end? ] [
-       let row csv:from-row file-read-line
-       set row but-first row
-       if i >= 0 [ set m1 lput row m1 ]
-       set i i + 1
-    ]
-
-    print(m1)
-
-    file-close
-end
-
+;hypotesis: the whole  product is reprocessed or goes to waste
 to reprocess
-  let i 0 ;righe
+  let num-rows length  m1
+  let num-columns length first m1
+ ;print (word "numero righe: " num-rows word " numero colonne: " num-columns)
+
+  let i 2 ;righe
   let j 0 ;colonne
-  while [ not file-at-end? ]
+          ;NB: per chiamare l'elemento i,j devo scrivere "item j item i m1"
+
+  while [ i < num-rows ]
   [
-    ifelse
-    [
-      ask products
+    let p-name-to-be-transformed item j item i m1
+
+    ask products with [p-name = p-name-to-be-transformed and p-residual-life <= (threshold-2 * p-shelf-life)]
       [
-     matrix:get m1 i j = p-name
-      ]
-    ]
+        set j j + 1 ;j=1
+        let n-products-to-transform n-of products
 
-    ;else
-    []
+        let p-waste item j item i m1
+        ;print ( word "p-waste" p-waste )
 
-      ;matrix:get m1  2   ; =>  (row 1, column 2), result is 6
+          if (p-waste > 0)
+          [
+          let n-products-to-waste ceiling (n-products-to-tranform * p-waste)
+          hatch
+            [
+              ;esempio waste
+              set p-name "waste"
+              set p-ID "w"
+              set shape "triangle"
+              set p-residual-life 0
+              set p-price 0
+              ;introdurre costo di smaltimento
+              set p-sustainability 0; fix
+            ]
+          let n-products-to-die n-products-to-tranform - n-products-to-waste
+          ask n-of n-products-to-die products with [p-name = prod-to-be-transformed] [die]
+        ]
 
+        while [j > 1 and j < num-columns]
+        [
+          set j j + 1 ;j=2
+          let percentual-reprocessing item j item i m1
 
+          if (percentual-reprocessing > 0)
+          [
+            let n-products-to-reprocess n-products-to-transform * percentual-reprocessing
+                  hatch percentual-reprocessing
+                  [
+                    ;Reprocess example: fruit and vegetables
+                    set p-name (item j item 0 m1)
+                    set p-ID "reprocessed"
+                    set p-residual-life (1.1 * p-residual-life)     ;fix
+                    set p-price (1.1 * p-price)                     ;fix
+                    set p-sustainability 1.1 * p-sustainability     ;fix
+                  ]
+                  ;print (word "p-amount: " p-amount " p-amount-hvr: " p-amount-hvr " p-hvr: " p-hvr)
+                  ;set p-amount p-amount - p-amount-hvr
 
+            if (text-part = "svr")
+               [
+                  let p-svr numeric-part
+                  hatch 1
+                  [
+                    ;esempio pollo-> pollo congelato
+                    set p-name "same value reprocess"
+                    set p-ID "svr"
+                    set p-amount-svr p-amount * p-svr
+                    set p-residual-life (1.1 * p-residual-life)     ;fix
+                    set p-sustainability (1.1 * p-sustainability)   ; fix
+                  ]
+                  ;set p-amount p-amount - p-amount-svr
+               ]
+
+            if (text-part = "lvr")
+               [
+                  let p-lvr numeric-part
+                  hatch 1
+                  [
+                    ;esempio pasta -> pasta con semola rimacinata
+                    set p-name "lower value reprocess"
+                    set p-ID "lvr"
+                    set p-amount-lvr p-amount * p-lvr
+                    set p-residual-life (1.1 * p-residual-life)     ;fix
+                    set p-price 0.9 * p-price                       ;fix
+                    set p-sustainability (1.1 * p-sustainability)   ;fix
+                  ]
+                  ;set p-amount p-amount - p-amount-lvr
+               ]
+          ]; end of if (numeric-part>0)
+      ]; end of second while
+
+        set p-amount ( p-amount - p-amount-w - p-amount-hvr - p-amount-svr - p-amount-lvr)
+
+    ]; end of ask product
+    set p-amount-w 0
+    set p-amount-hvr 0
+    set p-amount-svr 0
+    set p-amount-lvr 0
+    set i i + 1
+    set j 0
   ]
 
 end
@@ -71,6 +132,11 @@ ticks
 30.0
 
 @#$#@#$#@
+## IDEA
+- add attribute "already reprocessed" or "number of different materials present"
+
+
+
 ## WHAT IS IT?
 
 (a general understanding of what the model is trying to show or explain)

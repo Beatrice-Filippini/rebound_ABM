@@ -59,7 +59,7 @@ companies-own [
 
   ;production-capability ;v0.4-> for now it is not a constrain
   c-ID
-  company-demand     ;is used to calculate the company's earnings
+  c-demand     ;is used to calculate the company's earnings
   earnings
 
   ;companies memory
@@ -80,6 +80,7 @@ globals [
   p-net-revenues-list
   n-products
   c-len-memory
+  p-id-counter
 
   ;reprocess procedure
   ;n-products-to-transform
@@ -118,6 +119,7 @@ globals [
 to setup
   clear-all
   file-close-all
+  print "*********** NEW SIMULATION ***********"
   ask patches [ set pcolor white ]
   init-globals
   import-data
@@ -144,6 +146,7 @@ to init-globals ; NOTE: only here in the code i can have numbers because i'm set
   set p-amount-w 0
 
   set c-len-memory 10
+  set p-id-counter 0
   ;set n-products-to-transform 0
 end
 
@@ -223,7 +226,7 @@ to creation-users
     set omega random-float 1 ;RL/SL
     set stock random-float max-init-stock
     set buy-bool False ; at the beginning they does not buy
-    set trigger (85 + random 31)          ;FIX
+    set trigger 1; (85 + random 31)          ;FIX
     set stock-threshold 20
     set c 0.1 ; consumption rate of stock: CHECK for literature - for fashion ok around 2% vs for food a bit higher
   ]
@@ -234,21 +237,23 @@ to creation-companies
 
 
   ; first, create the companies
+  let id 0
   create-companies n-companies [
+    set id id + 1
     setxy random-xcor random-ycor
     set color black
     set size 3
     set shape "factory"
     ; FB lista di n-products elementi in cui la domanda iniziale è un dato vaòore che dipende dal numero di utenti e dal consumo che ne fanno (ragionevole)
-    set company-demand []
+    set c-demand []
     let i 0
     while [ i < n-products ] [
       let assuming-consumption item i cons-per-user ; FB: bisogna toglierlo e mettere il consumo specifico di ciascun bene
-      set company-demand lput ( n-users * assuming-consumption ) company-demand
+      set c-demand lput ( n-users * assuming-consumption ) c-demand
       set i i + 1
     ]
     set earnings 0
-    set c-ID 1
+    set c-ID id
 
 
     ; FB - assign behaivioral parameters
@@ -261,17 +266,19 @@ to creation-companies
     set c-memory []
     set i 0
     let j 0
-    while [ i < n-products ] [
+    while [ j < c-len-memory ] [
       let new-memory []
-      while [ j < c-len-memory ] [
+      while [ i < n-products ] [
         let demand-to-memory int ( 1 + (n-users * item i cons-per-user / n-companies ) )
         set new-memory lput demand-to-memory new-memory
-        set j j + 1
+        set i i + 1
       ]
       set c-memory lput new-memory c-memory
-      set i i + 1
-      set j 0
+      set j j + 1
+      set i 0
     ]
+
+    set c-new-memory n-values n-products [0]
   ]
 
   ; Then, create the stock
@@ -282,9 +289,11 @@ to creation-companies
     set init-stock-list lput int ( 1 + (n-users * item i cons-per-user / n-companies ) ) init-stock-list
     set i i + 1
   ]
+
   ask companies [
     set i 0
     let my-company self
+    let my-id id
     while [ i < n-products ] [
       hatch-products item i init-stock-list [
         set breed products
@@ -301,6 +310,11 @@ to creation-companies
         set p-acceptance item i p-acceptance-list
         set p-shelf-life item i p-shelf-life-list
         set p-residual-life item i p-residual-life-list
+
+        set owner-id my-id
+
+        set p-id p-id-counter
+        set p-id-counter p-id-counter + 1
 
       ]
       set i i + 1
@@ -322,6 +336,9 @@ end
 ; How simulation will evolve
 to go
 
+  ;zero, refresh variaables used to make counts
+  refresh-variables
+
   ; first, the consumer
   user-stock-consumption
   get-normalized-status
@@ -338,6 +355,17 @@ to go
   tick
 end
 
+to refresh-variables
+
+  ask users [ set buy-bool false ]
+  set best-products-list []
+  set best-companies-list []
+  set users-list []
+
+
+
+
+end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; CONSUMERS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -410,7 +438,7 @@ to utility-function-management
       set p-utility ( (p-quality-norm * my-alpha) + (p-sustainability-norm * my-beta) - (p-price-norm * my-gamma)) * (p-acceptance-norm * my-delta) * ((p-residual-life * my-omega) / p-shelf-life)
 
       set utilities-list lput p-utility utilities-list
-      set p-IDs-list lput who p-IDs-list
+      set p-IDs-list lput p-id p-IDs-list
       ;print (word "Prodotto ID: " p-ID " Utilità: " p-utility)
     ]
 
@@ -418,8 +446,8 @@ to utility-function-management
     let index-score position max-utility utilities-list
     let my-best-product item index-score p-IDs-list   ;returns a p-ID
     set utility-of-best-product max-utility
-
     let best-company ([owner-ID] of products with [p-ID = my-best-product])
+
     set users-list lput who users-list
     set best-products-list lput my-best-product best-products-list
     set best-companies-list lput best-company best-companies-list
@@ -431,10 +459,14 @@ to utility-function-management
 ;    ]
 
 
-   if (stock / stock-threshold) <= (utility-of-best-product * trigger)
-    [
+    if debug and who < 5 [
+      print ( word "who: " who " - s: " precision stock 2 "  - st:" precision stock-threshold 2 " - u:" precision utility-of-best-product 2 " t:" precision trigger 2 " |||||| left:" precision ( stock / stock-threshold ) 2 " <= right:" precision ( utility-of-best-product * trigger ) 2)
+      if max-utility = 0 [ print utilities-list ]
+    ]
+    if (stock / stock-threshold) <= (utility-of-best-product * trigger) [
       set buy-bool True ; the user buys an item
       let chosen-product products with [p-ID = my-best-product]
+      set chosen-product one-of chosen-product
       let chosen-company companies with [c-ID = [owner-ID] of chosen-product ]
 
       set stock stock + 1
@@ -444,17 +476,15 @@ to utility-function-management
         set earnings earnings + [ p-price ] of chosen-product ;FB poi ci saranno da mettere anche i costi di produzione
 
         ; add the memory in the correct position
-        let index-product position [ p-name ] of chosen-product p-name-list
-        let c-new-memory-to-add item index-product c-new-memory
-        set c-new-memory replace-item index-product c-new-memory c-new-memory-to-add
+        let index-product position [ p-name ] of chosen-product p-name-list ; trova l'indice del prodotto venduto (nelll'ordine del file CSV)
+        let c-new-memory-to-add item index-product c-new-memory ; prendo l'elemento da aumentare di uno dalla memoria temporanea
+        set c-new-memory-to-add c-new-memory-to-add + 1 ; lo aumento di 1 perché ho venduto 1
+        set c-new-memory replace-item index-product c-new-memory c-new-memory-to-add ; sostituisco con il valore da cui l'ho preso
       ]
 
       ask chosen-product [ die ]
-      set buy-bool false
     ]
   ]
-     set best-products-list []
-    set best-companies-list []
 
 end
 
@@ -467,117 +497,9 @@ to residual-life-consumption
   [
     set p-residual-life (p-residual-life - 1)
     ;print (word "prod name: " p-name " prod RL: " p-residual-life " prod SL: " p-shelf-life)
+    if p-residual-life = 0 [ die ] ; FB - qui c'è da gestire il reprossesing (magari mettiamo come ipotesi modellistica che è solo con vita = 0)
   ]
 end
-
-;to reprocess
-;  let num-rows length  m1
-;  let num-columns length first m1
-; ;print (word "numero righe: " num-rows word " numero colonne: " num-columns)
-;
-;  let i 1 ;righe
-;  let j 0 ;colonne
-;          ;NB: per chiamare l'elemento i,j devo scrivere "item j item i m1"
-;
-;  while [ i < num-rows ]
-;  [
-;    let p-name-in-matrix item j item i m1
-;
-;
-;    ask products with [p-name = p-name-in-matrix and p-residual-life <= (threshold-2 * p-shelf-life)]
-;      [
-;          set j j + 1 ;j=1
-;
-;          let p-waste item j item i m1
-;          print ( word "p-waste" p-waste )
-;
-;          if (p-waste > 0)
-;          [
-;          hatch 1
-;            [
-;              ;esempio waste
-;              set p-name "waste"
-;              set p-ID "w"
-;              set p-amount-w p-amount * p-waste
-;              set p-residual-life 0
-;              set p-price 0
-;              ;introdurre costo di smaltimento
-;              set p-sustainability 0; fix
-;            ]
-;          ;set p-amount p-amount - p-amount-w      ;CHECK dopo qualche iterazione
-;          ];fine if p-waste
-;
-;        while [j > 1 and j < num-columns]
-;        [
-;          set j j + 1 ;j=2
-;          let cell-text item j item i m1
-;          let numeric-part read-from-string (first (word cell-text "_"))
-;          let text-part last (word cell-text "_")
-;
-;          if (numeric-part > 0)
-;          [
-;            if (text-part = "hvr")
-;               [
-;                  let p-hvr numeric-part
-;                  hatch 1
-;                  [
-;                    ;Reprocess example: fruit and vegetables
-;                    set p-name "higher value reprocess"
-;                    set p-ID "hvr"
-;                    set p-amount-hvr p-amount * p-hvr
-;                    set p-residual-life (1.1 * p-residual-life)     ;fix
-;                    set p-price (1.1 * p-price)                     ;fix
-;                    set p-sustainability 1.1 * p-sustainability     ;fix
-;                  ]
-;                  ;print (word "p-amount: " p-amount " p-amount-hvr: " p-amount-hvr " p-hvr: " p-hvr)
-;                  ;set p-amount p-amount - p-amount-hvr
-;               ]
-;
-;            if (text-part = "svr")
-;               [
-;                  let p-svr numeric-part
-;                  hatch 1
-;                  [
-;                    ;esempio pollo-> pollo congelato
-;                    set p-name "same value reprocess"
-;                    set p-ID "svr"
-;                    set p-amount-svr p-amount * p-svr
-;                    set p-residual-life (1.1 * p-residual-life)     ;fix
-;                    set p-sustainability (1.1 * p-sustainability)   ; fix
-;                  ]
-;                  ;set p-amount p-amount - p-amount-svr
-;               ]
-;
-;            if (text-part = "lvr")
-;               [
-;                  let p-lvr numeric-part
-;                  hatch 1
-;                  [
-;                    ;esempio pasta -> pasta con semola rimacinata
-;                    set p-name "lower value reprocess"
-;                    set p-ID "lvr"
-;                    set p-amount-lvr p-amount * p-lvr
-;                    set p-residual-life (1.1 * p-residual-life)     ;fix
-;                    set p-price 0.9 * p-price                       ;fix
-;                    set p-sustainability (1.1 * p-sustainability)   ;fix
-;                  ]
-;                  ;set p-amount p-amount - p-amount-lvr
-;               ]
-;          ]; end of if (numeric-part>0)
-;      ]; end of second while
-;
-;        set p-amount ( p-amount - p-amount-w - p-amount-hvr - p-amount-svr - p-amount-lvr)
-;
-;    ]; end of ask product
-;    set p-amount-w 0
-;    set p-amount-hvr 0
-;    set p-amount-svr 0
-;    set p-amount-lvr 0
-;    set i i + 1
-;    set j 0
-;  ]
-;
-;end
 
 
 ;hypotesis: the whole  product is reprocessed or goes to waste
@@ -655,18 +577,74 @@ end
 
 to demand-assessment
   ask companies [
-
     ;c-new-memory
-
+    set c-memory fput c-new-memory c-memory
+    set c-memory but-last c-memory
     set c-new-memory n-values n-products [0] ; FB - questa è la nuova memoria cda aggigunere. Quanto hai agigutno, torna a 0 per il nuovo turno
+
   ]
 
 end
 
 
 to new-products-creation
+  print c-len-memory
+
+  ask companies [
+    print length c-memory
+
+    let i 0
+    while [ i < n-products ] [
+
+      let n-product-sold-class-i 0
+
+      let k 0
+
+      while [ k < c-len-memory ] [
+        set n-product-sold-class-i n-product-sold-class-i + item i ( item k c-memory )
+        set k k + 1
+      ]
+      set n-product-sold-class-i ceiling ( n-product-sold-class-i / c-len-memory ) ; i am doing the average demand
+      set c-demand replace-item i c-demand n-product-sold-class-i
+      set i i + 1
+    ]
+
+    set i 0
+    let my-company self
+    let my-id c-id
+    while [ i < n-products ] [
+
+      let i-demand item i c-demand
+      let i-stock count products with [ owner-id = my-id and p-name = item i p-name-list ]
+      let i-production i-demand - i-stock
+
+      hatch-products item i c-demand [
+        set breed products
+        set shape "box"
+        set color item i p-color-list
+        set size 1
+        set heading random 359
+        fd 3
+
+        set p-name item i p-name-list
+        set p-price item i p-price-min + ( item i p-price-max - item i p-price-min ) * [ c-price ] of my-company
+        set p-sustainability item i p-sustainability-min * ( item i p-sustainability-max - item i p-sustainability-min ) * [ c-sustainability ] of my-company
+        set p-quality item i p-quality-min * ( item i p-quality-max - item i p-quality-min ) * [ c-quality ] of my-company
+        set p-acceptance item i p-acceptance-list
+        set p-shelf-life item i p-shelf-life-list
+        set p-residual-life item i p-residual-life-list
+
+        set owner-id my-id
+
+        set p-id p-id-counter
+        set p-id-counter p-id-counter + 1
+
+      ]
+      set i i + 1
+    ]
 
 
+  ]
 
 
 end
@@ -713,8 +691,8 @@ GRAPHICS-WINDOW
 1
 1
 0
-1
-1
+0
+0
 1
 -16
 16
@@ -727,10 +705,10 @@ ticks
 30.0
 
 BUTTON
-49
-292
-112
-325
+28
+24
+91
+57
 setup
 setup
 NIL
@@ -744,10 +722,10 @@ NIL
 1
 
 BUTTON
-116
-292
-179
-325
+95
+24
+158
+57
 go
 go
 T
@@ -769,7 +747,7 @@ n-companies
 n-companies
 1
 20
-1.0
+2.0
 1
 1
 agents
@@ -784,7 +762,7 @@ n-users
 n-users
 10
 100
-10.0
+20.0
 5
 1
 agents
@@ -824,10 +802,10 @@ precision mean [ stock ] of users 2
 15
 
 BUTTON
-182
-292
-265
-325
+161
+24
+244
+57
 Go (once)
 go
 NIL
@@ -859,11 +837,11 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot count users with [ buy-bool ]"
 
 PLOT
-665
-196
-978
-350
-Stock of products
+663
+181
+976
+335
+User stock of products
 NIL
 NIL
 0.0
@@ -915,6 +893,45 @@ NIL
 NIL
 1
 
+SWITCH
+20
+259
+123
+292
+debug
+debug
+1
+1
+-1000
+
+TEXTBOX
+109
+56
+259
+81
+SALVA!!!!!!!!
+20
+0.0
+1
+
+PLOT
+662
+339
+979
+523
+Company stock of producs
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot count products"
+
 @#$#@#$#@
 ## COSA SISTEMARE?
 
@@ -955,6 +972,10 @@ n. in setup procedure - init- globals abbiamo inserito ask turtles altrimenti da
 - le aizende hanno una memoria di lunghezza fissa e la stessa
 - la memoria iniziale delle aziende riguardo alla domanda passata è n-utenti * consumo / n-aziende
 - quando entra nell'utente, ogni prodotto è uguale
+- le aziende hanno capacità produttiva infinita
+- il trigger è la preferenza di acquisto per ciascun utente generale. Gli utenti hanno trigger eterogenei
+- il reprossesing avviene solo con vita residua uguale a 0
+- la produzione delle aziende è fatta in modo che producano la domanda di ciascun prodotto meno lo stock che hanno già
 
 ## HOW IT WORKS
 
@@ -1318,7 +1339,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.4.0
+NetLogo 6.3.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

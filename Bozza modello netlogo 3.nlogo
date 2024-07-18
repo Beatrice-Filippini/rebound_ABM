@@ -224,11 +224,11 @@ to creation-users
     set alpha random-float 1 ;quality
     set delta 1 ;FIX acceptance
     set omega random-float 1 ;RL/SL
-    set stock random-float max-init-stock
+    set stock n-values n-products [random 5]
     set buy-bool False ; at the beginning they does not buy
     set trigger 1; (85 + random 31)          ;FIX
-    set stock-threshold 20
-    set c 0.1 ; consumption rate of stock: CHECK for literature - for fashion ok around 2% vs for food a bit higher
+    set stock-threshold 1
+    set c 2 ; consumption rate of stock of single user, alway between 0 and 1 (FB fare eterogeneo col random): CHECK for literature - for fashion ok around 2% vs for food a bit higher
   ]
 
 end
@@ -281,7 +281,7 @@ to creation-companies
     set c-new-memory n-values n-products [0]
   ]
 
-  ; Then, create the stock
+  ; Then, create the stock of the company
   ; FB to create the number of products according to the hypotesis (it is a stock), I need to compute in advance the n-utenti * consumo / n-aziende
   let i 0
   let init-stock-list []
@@ -357,7 +357,10 @@ end
 
 to refresh-variables
 
-  ask users [ set buy-bool false ]
+  ask users [
+    set buy-bool false
+    set color grey
+  ]
   set best-products-list []
   set best-companies-list []
   set users-list []
@@ -373,7 +376,16 @@ end
 to user-stock-consumption
   ask users
   [
-    set stock stock * (1 - c)
+    let i 0
+    while [ i < n-products ] [
+
+      let current-stock-i item i stock
+      let consumption-i item i cons-per-user
+      let future-stock max list ( current-stock-i - consumption-i ) 0
+      set stock replace-item i stock future-stock
+
+     set i i + 1
+    ]
   ]
 end
 
@@ -432,10 +444,21 @@ to utility-function-management
     let utilities-list []
     let p-IDs-list []
 
+    let my-stock stock
+    let my-stock-threshold stock-threshold
+
 
     ask products
     [
+
+      ; first, compute the utlity assumiung that the stock is not relevant (how I like the stock)
       set p-utility ( (p-quality-norm * my-alpha) + (p-sustainability-norm * my-beta) - (p-price-norm * my-gamma)) * (p-acceptance-norm * my-delta) * ((p-residual-life * my-omega) / p-shelf-life)
+
+      ; second,
+      let index-product position p-name p-name-list
+      let i-stock item index-product my-stock
+      set p-utility p-utility * max list ( 1 - i-stock / my-stock-threshold ) 0 ; FB - fate un bel commentoe per ricordare che cosa voglia dre quest cosa qui, altrimenti me ne dimentico anche io
+
 
       set utilities-list lput p-utility utilities-list
       set p-IDs-list lput p-id p-IDs-list
@@ -458,25 +481,34 @@ to utility-function-management
 ;      set p-net-revenues-list lput ( ( [p-price] of one-of products with [p-ID = last best-products-list]) - ([p-production-cost] of one-of products with [p-ID = last best-products-list])) p-net-revenues-list
 ;    ]
 
+;FB - vi prego commenatemi ogni linea di codice, aiutatemi ad aiutarvi
+; FB - commentate lungamente sopra ogni funzione che cosa fa e quali sono i processi
+; FB - fatevi un disegnino carta e penna di pgni funzione che cosa fa, tipo un diagramma di flusso
 
     if debug and who < 5 [
       print ( word "who: " who " - s: " precision stock 2 "  - st:" precision stock-threshold 2 " - u:" precision utility-of-best-product 2 " t:" precision trigger 2 " |||||| left:" precision ( stock / stock-threshold ) 2 " <= right:" precision ( utility-of-best-product * trigger ) 2)
       if max-utility = 0 [ print utilities-list ]
     ]
-    if (stock / stock-threshold) <= (utility-of-best-product * trigger) [
+
+    let chosen-product products with [p-ID = my-best-product]; trova l'indice del prodotto venduto (nelll'ordine del file CSV)
+    let index-product position ( [ p-name ] of one-of chosen-product ) p-name-list ;FB - commentare per ricordare
+    let i-stock item index-product my-stock
+    let stock-ratio max list ( 1 - i-stock / stock-threshold ) 0
+
+    if stock-ratio <= (utility-of-best-product * trigger) [
       set buy-bool True ; the user buys an item
-      let chosen-product products with [p-ID = my-best-product]
+      set color pink
+
       set chosen-product one-of chosen-product
       let chosen-company companies with [c-ID = [owner-ID] of chosen-product ]
 
-      set stock stock + 1
+      set stock replace-item index-product stock ( i-stock + 1 )
 
       ask chosen-company [
         ; add the earnings
         set earnings earnings + [ p-price ] of chosen-product ;FB poi ci saranno da mettere anche i costi di produzione
 
         ; add the memory in the correct position
-        let index-product position [ p-name ] of chosen-product p-name-list ; trova l'indice del prodotto venduto (nelll'ordine del file CSV)
         let c-new-memory-to-add item index-product c-new-memory ; prendo l'elemento da aumentare di uno dalla memoria temporanea
         set c-new-memory-to-add c-new-memory-to-add + 1 ; lo aumento di 1 perché ho venduto 1
         set c-new-memory replace-item index-product c-new-memory c-new-memory-to-add ; sostituisco con il valore da cui l'ho preso
@@ -523,7 +555,7 @@ to reprocess
 
         let p-waste item j item i m1
         let n-products-to-transform (count products)
-        print ( word "n-products-to-transform" n-products-to-transform )
+        ;print ( word "n-products-to-transform" n-products-to-transform )
 
           if (p-waste > 0)
           [
@@ -588,7 +620,6 @@ end
 
 
 to new-products-creation
-  print c-len-memory
 
   ask companies [
     print length c-memory
@@ -615,8 +646,7 @@ to new-products-creation
     while [ i < n-products ] [
 
       let i-demand item i c-demand
-      let i-stock count products with [ c-id = my-id and p-name = item i p-name-list ]
-
+      let i-stock count products with [ owner-id = my-id and p-name = item i p-name-list ]
       let i-production i-demand - i-stock
 
       hatch-products item i c-demand [
@@ -853,7 +883,7 @@ true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot mean [ stock ] of users"
+"default" 1.0 0 -16777216 true "" "plot mean [ sum stock ] of users"
 
 MONITOR
 16
@@ -977,6 +1007,7 @@ n. in setup procedure - init- globals abbiamo inserito ask turtles altrimenti da
 - il trigger è la preferenza di acquisto per ciascun utente generale. Gli utenti hanno trigger eterogenei
 - il reprossesing avviene solo con vita residua uguale a 0
 - la produzione delle aziende è fatta in modo che producano la domanda di ciascun prodotto meno lo stock che hanno già
+- un utente compra solo un prodotto per ciascun turno, indipendentemente dalle quantità (è un modello teorico, ma vi dovete laurerare)
 
 ## HOW IT WORKS
 

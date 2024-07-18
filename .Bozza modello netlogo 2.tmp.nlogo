@@ -414,12 +414,15 @@ to utility-function-management
       ;print (word "Prodotto ID: " p-ID " Utilità: " p-utility)
     ]
 
+    ;if length utilities-list > 0
+    ;[
     let max-utility max (utilities-list)
+    print (word "who" who word " lista " utilities-list)
     let index-score position max-utility utilities-list
     let my-best-product item index-score p-IDs-list   ;returns a p-ID
     set utility-of-best-product max-utility
 
-    let best-company ([owner-ID] of products with [p-ID = my-best-product])
+    let best-company ([owner-ID] of  products with [p-ID = my-best-product])
     set users-list lput who users-list
     set best-products-list lput my-best-product best-products-list
     set best-companies-list lput best-company best-companies-list
@@ -452,6 +455,7 @@ to utility-function-management
       ask chosen-product [ die ]
       set buy-bool false
     ]
+ ;]
   ]
      set best-products-list []
     set best-companies-list []

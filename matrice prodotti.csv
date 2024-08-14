@@ -1,7 +1,7 @@
-name,Waste,Fresh fruits and vegetables,Frozen Food,Sweets,Canned  Food,Meat,Fish,Pasta
+name,Waste,Fresh fruits and vegetables,Frozen food,Sweets,Canned  Food,Meat,Fish,Pasta
 Waste,0,0,0,0,0,0,0,0
 Fresh fruits and vegetables,0.95,0.05,0,0,0,0,0,0
-Frozen Food,0.9,0,0.1,0,0,0,0,0
+Frozen food,0.9,0,0.1,0,0,0,0,0
 Sweets,1,0,0,0,0,0,0,0
 Canned Food,1,0,0,0,0,0,0,0
 Meat,0.7,0,0.3,0,0,0,0,0

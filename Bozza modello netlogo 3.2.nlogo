@@ -19,6 +19,8 @@ products-own [
   p-production-cost
   owner-ID
   p-amount
+  primary-prod
+  p-stock-threshold
 
   ;used for utility calculations
   p-price-norm
@@ -40,7 +42,7 @@ users-own
 
   stock
   trigger      ;used to evaluate whether to buy
-  stock-threshold
+  ;stock-threshold
   c            ;stock consumption rate
 
   ;best-company
@@ -75,7 +77,7 @@ globals [
   best-products-list    ;global list which saves the p-ID of the best product chosen by each user
   best-companies-list   ;global list which saves the c-ID of the company which produces the best product
   p-net-revenues-list
-  n-products
+  n-class-of-products
   c-len-memory
   p-id-counter
 
@@ -93,8 +95,10 @@ globals [
   p-acceptance-list
   p-shelf-life-list
   p-residual-life-list
-  cons-per-user-list
+  p-cons-per-user-list
   p-color-list
+  primary-prod-list
+  p-stock-threshold-list
 
 ]
 
@@ -150,14 +154,16 @@ to import-data
   set p-acceptance-list []
   set p-shelf-life-list []
   set p-residual-life-list []
-  set cons-per-user-list []
+  set p-cons-per-user-list []
   set p-color-list []
+  set primary-prod-list []
+  set p-stock-threshold-list []
 
   file-close-all
   file-open "Input_data_products.csv"
   let result csv:from-row file-read-line
   let m2 csv:from-file "Input_data_products.csv"
-  set n-products ( length m2 - 1 )
+  set n-class-of-products ( length m2 - 1 )
   while [ not file-at-end? ]
   [
     let row csv:from-row file-read-line
@@ -172,8 +178,10 @@ to import-data
     set p-acceptance-list lput item 5 row p-acceptance-list
     set p-shelf-life-list lput item 6 row p-shelf-life-list
     set p-residual-life-list lput item 7 row p-residual-life-list
-    set cons-per-user-list lput item 23 row cons-per-user-list
+    set p-cons-per-user-list lput item 23 row p-cons-per-user-list
     set p-color-list lput item 24 row p-color-list
+    set primary-prod-list lput item 25 row primary-prod-list
+    set p-stock-threshold-list lput item 26 row p-stock-threshold-list
 
   ]
   file-close
@@ -208,10 +216,14 @@ to creation-users
     set alpha random-float 1    ;FIX quality
     set delta 1                 ;FIX acceptance
     set omega random-float 1    ;RL/SL
-    set stock n-values n-products [random 5]   ; each user has a stock of n-products (number of lines of the categories of products) and sets the initial stock of each category as a random  number between 0 and 5
+    set stock n-values n-class-of-products [random 10]
+    ; each user has a stock of n-class-of-products (number of lines of the categories of products) and sets the initial stock of each category as a random  number between 0 and 5
+
     set buy-bool False                         ; at the beginning they does not buy
-    set trigger 1                              ;FIX
-    set stock-threshold ( 0.5 + random-float 0.5 )
+    set trigger 5 + random 5
+
+    ;FIX
+    ;set stock-threshold ( 0.5 + random-float 0.5 )
     ;set c 2  ;substituted with consumption-i  ;consumption rate of stock of single user, alway between 0 and 1 (FB fare eterogeneo col random): CHECK for literature - for fashion ok around 2% vs for food a bit higher
   ]
 
@@ -229,13 +241,13 @@ to creation-companies
     set shape "factory"
     set earnings 0
     set c-ID id
-    ; FB lista di n-products (7) elementi in cui la domanda iniziale è un dato valore che dipende dal numero di utenti e dal consumo che ne fanno (ragionevole)
+    ; FB lista di n-class-of-products (7) elementi in cui la domanda iniziale è un dato valore che dipende dal numero di utenti e dal consumo che ne fanno (ragionevole)
     set c-demand []
 
     ; For each product we have a consumption rate (f.e. 20%), consequently we hypothesize that the (cons-per-user)% of users (f.e. 20%) will buy that specific category of product today
     let i 0
-    while [ i < n-products ] [
-      let assuming-consumption item i cons-per-user-list ; FB: bisogna toglierlo e mettere il consumo specifico di ciascun bene
+    while [ i < n-class-of-products ] [
+      let assuming-consumption item i p-cons-per-user-list ; FB: bisogna toglierlo e mettere il consumo specifico di ciascun bene
       set c-demand lput ( n-users * assuming-consumption ) c-demand  ; total demand (of the whole system)
       set i i + 1
     ]
@@ -253,8 +265,8 @@ to creation-companies
     let j 0
     while [ j < c-len-memory ] [
       let new-memory []
-      while [ i < n-products ] [
-        let demand-to-memory int ( 1 + (n-users * item i cons-per-user-list / n-companies ) )
+      while [ i < n-class-of-products ] [
+        let demand-to-memory int ( 1 + (n-users * item i p-cons-per-user-list / n-companies ) )
         set new-memory lput demand-to-memory new-memory
         set i i + 1
 
@@ -264,7 +276,7 @@ to creation-companies
       set i 0
 
     ]
-    set c-new-memory n-values n-products [0]
+    set c-new-memory n-values n-class-of-products [0]
     ;print c-memory
   ]
 
@@ -273,8 +285,8 @@ to creation-companies
   ; Create the number of products according to the hypothesis (it is a stock)
   let i 0
   let init-stock-list []
-  while [ i < n-products ] [
-    set init-stock-list lput int ( 1 + (n-users * item i cons-per-user-list / n-companies ) ) init-stock-list
+  while [ i < n-class-of-products ] [
+    set init-stock-list lput int ( 1 + (n-users * item i p-cons-per-user-list / n-companies ) ) init-stock-list
     set i i + 1
   ]
 
@@ -282,7 +294,7 @@ to creation-companies
     set i 0
     let my-company self
     let my-id id
-    while [ i < n-products ] [
+    while [ i < n-class-of-products ] [
       hatch-products item i init-stock-list [
         set breed products
         set shape "box"
@@ -293,17 +305,25 @@ to creation-companies
 
         ;In order to make heterogenous the features
         set p-name item i p-name-list
+
+        ; given the possible price range for each class of products, when generating a new product, it will assume a price equal to the baseline + a  random value taken trom the price range
         let price-variability ( item i p-price-max-list - item i p-price-min-list ) * [ c-price ] of my-company
         set p-price item i p-price-min-list + ( random price-variability )
         ;print (word "p-category: " item i p-name-list word " baseline:" item i p-price-min-list  word " price-variability: " price-variability word " p-price: " p-price)
+
+        ; given the possible sustainability range for each class of products, the new product will assume a sustainability value = baseline + random value of the sustainability range * company-sustainability
         let sustainability-variability ( item i p-sustainability-max-list - item i p-sustainability-min-list )
-        set p-sustainability item i p-sustainability-min-list + (sustainability-variability * [ c-sustainability ] of my-company ) ;review
+        set p-sustainability item i p-sustainability-min-list + (random sustainability-variability * [ c-sustainability ] of my-company ) ;review
+
         let p-quality-variability ( item i p-quality-max-list - item i p-quality-min-list )
         set p-quality item i p-quality-min-list + (p-quality-variability * [ c-quality ] of my-company) ;review
 
         set p-acceptance item i p-acceptance-list
         set p-shelf-life item i p-shelf-life-list
         set p-residual-life item i p-residual-life-list
+
+        set primary-prod item i primary-prod-list
+        set p-stock-threshold item i p-stock-threshold-list
 
         set owner-id my-id
 
@@ -340,7 +360,8 @@ to go
 
   ; then, the product
   residual-life-consumption
-  reprocess
+  strategy-discount
+  strategy-reprocess
 
   ; finally, the company
   demand-assessment
@@ -370,10 +391,10 @@ to user-stock-consumption
   ask users
   [
     let i 0
-    while [ i < n-products ] [
+    while [ i < n-class-of-products ] [
 
       let current-stock-i item i stock
-      let consumption-rate-i item i cons-per-user-list
+      let consumption-rate-i item i p-cons-per-user-list
       let consumption-i (consumption-rate-i) * current-stock-i
       let future-stock-i max list ( current-stock-i - consumption-i ) 0
       set stock replace-item i stock future-stock-i
@@ -389,7 +410,7 @@ to get-normalized-status
   ask products
   [
     let my-name p-name
-    ifelse (n-products = 1)
+    ifelse (n-class-of-products = 1)
     [
       set p-sustainability-norm p-sustainability
       set p-price-norm p-price
@@ -435,34 +456,42 @@ to utility-function-management
     set utilities-list []
     set p-IDs-list []
 
-    let my-stock stock
+    let my-stock stock ; which was initialized as a list with random values between 5 and 10
+
     ; each user has a different threshold
-    let my-stock-threshold stock-threshold
+    ;let my-stock-threshold p-stock-threshold
 
 
     ask products
     [
 
-      ; first, compute the utlity assumiung that the stock is not relevant (how I like the stock)
-      set p-utility ( (p-quality-norm * my-alpha) + (p-sustainability-norm * my-beta) - (p-price-norm * my-gamma)) * (p-acceptance-norm * my-delta) * ((p-residual-life * my-omega) / p-shelf-life)
+      ; first, compute the utility assumiung that the stock is not relevant (how I like the stock)
+      set p-utility ( (p-quality * my-alpha) + (p-sustainability * my-beta) - (p-price * my-gamma)) * (p-acceptance * my-delta) * ((p-residual-life * my-omega) / p-shelf-life)
 
-      ; second,
+      ; second, i evaluate how much stock i have for each class of products
       let index-product position p-name p-name-list
+      ;print position p-name p-name-list
       let i-stock item index-product my-stock
+      let i-stock-threshold item index-product p-stock-threshold-list
+      ;print (word "index-product: "index-product word " my-stock: " my-stock)
       ; se ho uno stock target/massimo, calcolo quanto mi manca ad arrivare quel limite e moltiplico quel valore per l'utilità:
       ; se mi mancano tanti prodotti della categoria i--> questo calcolo amplificherà la propensione all'acquisto per quello specifico prodotto
       ; se per una data categoria, ho lo stock che si avvicina al limite --> questo calcolo diminuirà la propensione all'acquisto
       ; se ho più prodotti rispetto allo stock target,  (1 - i-stock / my-stock-threshold) sarà negativo, di conseguenza prendo il valore 0
       ; così, aggiungiamo un vincolo sui valori che può assumere l'utilità che deve essere >=0
-      set p-utility p-utility * max list ( 1 - i-stock / my-stock-threshold ) 0 ; FB - fate un bel commentoe per ricordare che cosa voglia dre quest cosa qui, altrimenti me ne dimentico anche io
+      let stock-ratio 1 - i-stock / i-stock-threshold
 
+      set p-utility p-utility * ( stock-ratio ) ; FB - fate un bel commentoe per ricordare che cosa voglia dre quest cosa qui, altrimenti me ne dimentico anche io
 
       set utilities-list lput p-utility utilities-list
-      set p-IDs-list lput p-id p-IDs-list
-      ;print (word "Prodotto ID: " p-ID " Utilità: " p-utility)
+      set p-IDs-list lput p-ID p-IDs-list
+      ;print utilities-list
+
+;      if debug [
+;      print ( word "who: " who word "utilities-list" utilities-list word "my-beta" my-beta word "  my-alpha" my-alpha "  my-gamma" my-gamma " my-delta" my-delta "  my-omega" my-omega "**************" "p-quality-norm "p-quality-norm "p-sustainability-norm "p-sustainability-norm "p-price-norm"p-price-norm)
+;    ]
     ]
 
-    ;print (word "number of products: " count products word "   lista utilities: "utilities-list)
     let max-utility max (utilities-list)
     let index-score position max-utility utilities-list
     let my-best-product item index-score p-IDs-list   ;returns a p-ID
@@ -472,6 +501,7 @@ to utility-function-management
     set users-list lput who users-list
     set best-products-list lput my-best-product best-products-list
     set best-companies-list lput best-company best-companies-list
+
 
     ;print (word "my BP: " my-best-product word "users-list: " users-list word " best-products-list: " best-products-list word " best-companies-list: " best-companies-list word " best-company: " best-company)
 ;    ask products
@@ -484,18 +514,24 @@ to utility-function-management
 ; FB - fatevi un disegnino carta e penna di pgni funzione che cosa fa, tipo un diagramma di flusso
 
     if debug and who < 5 [
-      print ( word "who: " who " - s: " precision stock 2 "  - st:" precision stock-threshold 2 " - u:" precision utility-of-best-product 2 " t:" precision trigger 2 " |||||| left:" precision ( stock / stock-threshold ) 2 " <= right:" precision ( utility-of-best-product * trigger ) 2)
+      print ( word "who: " who " - s: " precision stock 2 "  - st:" precision p-stock-threshold 2 " - u:" precision utility-of-best-product 2 " t:" precision trigger 2 " |||||| left:" precision ( stock / p-stock-threshold ) 2 " <= right:" precision ( utility-of-best-product * trigger ) 2)
       if max-utility = 0 [ print utilities-list ]
     ]
+
+
+
 
     let chosen-product products with [p-ID = my-best-product]; trova l'indice del prodotto venduto (nelll'ordine del file CSV)
     let index-product position ( [ p-name ] of one-of chosen-product ) p-name-list ;FB - commentare per ricordare
     let i-stock item index-product my-stock
-    let stock-ratio max list ( 1 - i-stock / stock-threshold ) 0
+    let i-stock-threshold item index-product p-stock-threshold-list
+    let stock-ratio max list ( 1 - i-stock / i-stock-threshold ) 0
+    ;let stock-ratio  1 - i-stock / stock-threshold
 
     if stock-ratio <= (utility-of-best-product * trigger) [
       set buy-bool True ; the user buys an item
       set color pink
+      print (word "tick" ticks word "who" [who] of self word " stock-ratio "stock-ratio word "  utility-of-best-product * trigger  " (utility-of-best-product * trigger) )
 
       set chosen-product one-of chosen-product
       let chosen-company companies with [c-ID = [owner-ID] of chosen-product ]
@@ -531,10 +567,16 @@ to residual-life-consumption
   ]
 end
 
+to strategy-discount
+  ask products with [ p-residual-life <= (threshold-1 * p-shelf-life)]
+  [
+    set p-price 0.9 * p-price
+  ]
+end
 
 ;hypotesis: the whole  product is reprocessed or goes to waste
 
-to reprocess
+to strategy-reprocess
   let num-rows length  m1
   let num-columns length first m1
  ;print (word "numero righe: " num-rows word " numero colonne: " num-columns)
@@ -542,46 +584,56 @@ to reprocess
   let i 2 ;righe
   let j 0 ;colonne
           ;NB: per chiamare l'elemento i,j devo scrivere "item j item i m1"
+  let total-products count products
 
   while [ i < num-rows ]
   [
     let p-name-to-be-transformed item j item i m1
+    ;print (word "numero agenti totali: " count products)
 
+    ;here only the products with an amount of residual life <= 1/3 (or ...) of the shelf life, will be reprocessed
     ask products with [p-name = p-name-to-be-transformed and p-residual-life <= (threshold-2 * p-shelf-life)]
       [
+        ;print (word "numero agenti da riprocessare: " count products word " RL:  " mean [p-residual-life] of products word " t2* SL: " threshold-2 * (mean [p-shelf-life] of products) )
         set j j + 1 ;j=1
 
         let p-waste item j item i m1
-        let n-products-to-transform (count products)
-        ;print ( word "n-products-to-transform" n-products-to-transform )
+        let n-class-of-products-to-transform (count products)
+        ;print ( word "n-class-of-products-to-transform" n-class-of-products-to-transform )
 
           if (p-waste > 0)
           [
-          let n-products-to-waste ceiling (n-products-to-transform * p-waste)
+          let n-class-of-products-to-waste ceiling (n-class-of-products-to-transform * p-waste)
 
-          ask n-of n-products-to-waste products [die]
+          ask n-of n-class-of-products-to-waste products [die]
+          ;print (word "CIAO " p-name-to-be-transformed word "total-products: "total-products word "  n-class-of-products-to-transform: " n-class-of-products-to-transform word "  n-class-of-products-to-waste: " n-class-of-products-to-waste word "  prodotti rimasti: " count products)
           ;previous version
-          ;ask n-of n-products-to-waste products with [p-name = p-name-to-be-transformed] [die]
+          ;ask n-of n-class-of-products-to-waste products with [p-name = p-name-to-be-transformed] [die]
         ]
 
-        while [j > 1 and j < num-columns]
+        ;perform the while until (num-column - 1) because, as the procedure enters the while cycle, j is incremented of 1 unit, so the last iteration will happen with j= index of the last column
+        while [j >= 1 and j < (num-columns - 1)]
         [
-          set j j + 1 ;j=2
+
+          set j j + 1
+
           let percentual-reprocessing item j item i m1
 
-          if (percentual-reprocessing > 0)
+          if (percentual-reprocessing > 0 )
           [
-            let n-products-to-reprocess floor (n-products-to-transform * percentual-reprocessing)
-            hatch n-products-to-reprocess
+            let n-class-of-products-to-reprocess floor (n-class-of-products-to-transform * percentual-reprocessing)
+
+            let n-class-of-products-to-reprocess-min min (list n-class-of-products-to-reprocess (count products))
+
+            hatch n-class-of-products-to-reprocess-min
             [
               ;Reprocess example: fruit and vegetables
-              set p-name word (item j item 0 m1) " - reprocessed"
-              set p-ID "reprocessed" ; FIX metti id crescente usando il counter
-              let p-name-k (item j item 0 m1)
+              set p-name (item j item 0 m1)
+              set p-ID p-id-counter ; FIX metti id crescente usando il counter
+              set p-id-counter p-id-counter + 1
+              set primary-prod 0
+              let p-name-k p-name
               let k position p-name-k p-name-list
-              print position p-name-k p-name-list
-              print p-name-k
-              print p-name-list
               ;print (word "p-name-k: " p-name-k word " item: " position p-name-k p-name-list)
 
 
@@ -592,9 +644,10 @@ to reprocess
               set p-residual-life 1.1 * p-residual-life ;fix
               set p-sustainability 1.1 * p-sustainability
             ]
-            let n-products-to-die n-products-to-reprocess
-            ask n-of n-products-to-reprocess products with [p-name = p-name-to-be-transformed] [die]
-            ;print (word "p-amount: " p-amount " p-amount-hvr: " p-amount-hvr " p-hvr: " p-hvr)
+            let n-class-of-products-to-die n-class-of-products-to-reprocess-min
+            ;print (word "n-class-of-products-to-die: " n-class-of-products-to-die " n-class-of-products-to-reprocess-min: " n-class-of-products-to-reprocess-min " n-class-of-products-to-reprocess: " n-class-of-products-to-reprocess " n-class-of-products  " count products with [p-name = p-name-to-be-transformed and p-residual-life <= (threshold-2 * p-shelf-life)])
+            ask n-of n-class-of-products-to-die products [die]
+
           ]
         ]
         set j 0
@@ -608,16 +661,16 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; COMPANY ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;C-memory is a list of 10 sublists: each sublist has a number of elements equal to n-class-of-products and represents the purchases done by users for each class of products in a specific tick
+;c-new-memory: represents the purchases of the current tick and is added to the list
 to demand-assessment
   ask companies [
     ;c-new-memory
-    set c-memory fput c-new-memory c-memory
-    set c-memory but-last c-memory
-    set c-new-memory n-values n-products [0] ; FB - questa è la nuova memoria cda aggigunere. Quanto hai agigutno, torna a 0 per il nuovo turno
+    set c-memory fput c-new-memory c-memory  ; c-memory= [[c-new-memory] [sublist 1]...etc [sublist 11]]
+    set c-memory but-last c-memory ; c-memory= [[c-new-memory] [sublist 1]...etc [sublist 10]]
+    set c-new-memory n-values n-class-of-products [0] ; FB - questa è la nuova memoria cda aggigunere. Quanto hai agigutno, torna a 0 per il nuovo turno
 ;print (word "c-id" c-id word " c-price: " c-price word "   c-memory" c-memory)
-
   ]
-
 end
 
 
@@ -626,32 +679,38 @@ to new-products-creation
   ask companies [
     ;print length c-memory
 
-    let i 0
-    while [ i < n-products ] [
+    let i 0 ;i= each class of products
+
+    while [ i < n-class-of-products ] [
 
       let n-product-sold-class-i 0
 
-      let k 0
+      let k 0 ; k= time step
 
+      ; analyse the list c-memory of lenght = c-len-memory (10)
       while [ k < c-len-memory ] [
+        ; es: the first class of products for the last period
         set n-product-sold-class-i n-product-sold-class-i + item i ( item k c-memory )
-        set k k + 1
+        set k k + 1 ;move to the previous element of the order history
       ]
+      ; at the end of this while cycle, we know how much of a class of products has been sold in the last periods
+      ; now an average sales per day/month for each class of products can be calculated
       set n-product-sold-class-i ceiling ( n-product-sold-class-i / c-len-memory ) ; i am doing the average demand
       set c-demand replace-item i c-demand n-product-sold-class-i
       set i i + 1
     ]
 
     set i 0
-    let my-company self
+    let my-company self ;returns who of the company
     let my-id c-id
-    while [ i < n-products ] [
+    while [ i < n-class-of-products ] [
 
-      let i-demand item i c-demand
-      let i-stock count products with [ owner-id = my-id and p-name = item i p-name-list ]
-      let i-production i-demand - i-stock
+      let c-i-demand item i c-demand
+      let c-i-stock count products with [ owner-id = my-id and p-name = item i p-name-list ]
+      let i-production max list (c-i-demand - c-i-stock) (0)
+      ;print (word "ticks" ticks word "  c-id  " c-id word "  p-name  " item i p-name-list word "  c-i-stock  "  c-i-stock word " c-i-demand  "c-i-demand word "  i-production  " i-production )
 
-      hatch-products item i c-demand [
+      hatch-products i-production [
         set breed products
         set shape "box"
         set color item i p-color-list
@@ -660,9 +719,15 @@ to new-products-creation
         fd 3
 
         set p-name item i p-name-list
-        set p-price item i p-price-min-list + ( item i p-price-max-list - item i p-price-min-list ) * [ c-price ] of my-company
-        set p-sustainability item i p-sustainability-min-list * ( item i p-sustainability-max-list - item i p-sustainability-min-list ) * [ c-sustainability ] of my-company
-        set p-quality item i p-quality-min-list * ( item i p-quality-max-list - item i p-quality-min-list ) * [ c-quality ] of my-company
+        let price-variability ( item i p-price-max-list - item i p-price-min-list ) * [ c-price ] of my-company
+        set p-price item i p-price-min-list + ( random price-variability )
+
+        let sustainability-variability ( item i p-sustainability-max-list - item i p-sustainability-min-list )
+        set p-sustainability item i p-sustainability-min-list + (random sustainability-variability * [ c-sustainability ] of my-company )
+
+        let p-quality-variability ( item i p-quality-max-list - item i p-quality-min-list )
+        set p-quality item i p-quality-min-list + (p-quality-variability * [ c-quality ] of my-company) ;review
+
         set p-acceptance item i p-acceptance-list
         set p-shelf-life item i p-shelf-life-list
         set p-residual-life item i p-residual-life-list
@@ -794,8 +859,8 @@ SLIDER
 n-users
 n-users
 10
-100
-50.0
+50
+15.0
 5
 1
 agents
@@ -892,8 +957,8 @@ MONITOR
 188
 191
 249
-n-products
-n-products
+n-class-of-products
+n-class-of-products
 0
 1
 15
@@ -948,9 +1013,23 @@ false
 PENS
 "default" 1.0 0 -16777216 true "" "plot count products"
 
+MONITOR
+1315
+91
+1441
+136
+number of products
+count products
+17
+1
+11
+
 @#$#@#$#@
-## COSA SISTEMARE?
+## NOTA BENE
 - nota: netlogo è case sensitive, quindi può essere necessario implementare un check sul nome dei prodotti inseriti nella matrice
+
+### IN SOSPESO
+- trigger: decidere cosa fare
 
 
 ### FUTURE IMPLEMENTATION
@@ -961,7 +1040,9 @@ PENS
 ## Cose modificate rispetto all'ultimo incontro: 
 - Cambiato il modo in cui settare prezzo, qualità, sostenibilità dei prodotti nuovi generati: introdotte price-variability,...etc
 - in fase di normalizzazione delle variabili usate per calcolare l'utilità, se il valore min e il valore max sono uguali, allora settiamo il valore normalizzato a 0.5 (Non più 1 come prima)
+- abbiamo rimosso i valori normalizzati di p-sustainability...etc in quanto i valori estremi (p-sustainability min e max), una volta normalizzati assumevano rispettivamente valori = 0 e 1, creando problemi nella funzione di utilità
 - la stock-threshold non è più uguale per ogni utente ma è randomica (compresa tra 0.5 e 1 per renderla più sensata con il food)
+
 
 ## IPOTESI MODELLISTICHE (da mettere in ordine per tipo di agente)
 
@@ -976,7 +1057,7 @@ PENS
 - quando entra nell'utente, ogni prodotto è uguale
 - le aziende hanno capacità produttiva infinita
 - il trigger è la preferenza di acquisto per ciascun utente generale. Gli utenti hanno trigger eterogenei
-- il reprossesing avviene solo con vita residua uguale a 0
+- il reprocessesing avviene solo con vita residua > 0 (<= alla soglia di threshold-2 * shelf life)
 - la produzione delle aziende è fatta in modo che producano la domanda di ciascun prodotto meno lo stock che hanno già
 - un utente compra solo un prodotto per ciascun turno, indipendentemente dalle quantità (è un modello teorico, ma vi dovete laurerare)
 - l'utilità deve essere >=0 a zero--> da rivedere se non troviamo l'effetto rebound!!!

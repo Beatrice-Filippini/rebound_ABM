@@ -29,6 +29,7 @@ products-own [
   p-acceptance-norm
   p-residual-life-norm
   p-utility
+  p-init-utility
 
  ]
 
@@ -42,8 +43,8 @@ users-own
 
   stock
   trigger      ;used to evaluate whether to buy
-  ;stock-threshold
-  c            ;stock consumption rate
+  budget-of-period       ; available amount of money for the purchase of products
+  tot-budget
 
   ;best-company
   utility-of-best-product
@@ -80,6 +81,8 @@ globals [
   n-class-of-products
   c-len-memory
   p-id-counter
+  wasted-prod
+  wasted-prod-cum
 
   utilities-list
   p-IDs-list
@@ -138,6 +141,8 @@ to init-globals
 
   set c-len-memory 10  ; keeps into account 10 ticks of memory in order to calculate company demand forecasting
   set p-id-counter 0   ; to assing the correct and increasing p-id to each product that is generated
+  set wasted-prod 0
+  set wasted-prod-cum 0
 
 end
 
@@ -218,10 +223,13 @@ to creation-users
     set delta 1                 ;FIX acceptance
     set omega random-float 1    ;RL/SL
     set stock n-values n-class-of-products [random user-initial-stock]
+    print stock
     ; each user has a stock of n-class-of-products (number of lines of the categories of products) and sets the initial stock of each category as a random  number between 0 and 5
 
     set buy-bool False                         ; at the beginning they does not buy
     set trigger trigger-baseline + random 5
+    set budget-of-period (5 + random 10)   ; there is a daily budget per person between 5 and 15 euros. if the budget accumulates and doesn't reset
+    set tot-budget 0
 
     ;FIX
     ;set stock-threshold ( 0.5 + random-float 0.5 )
@@ -249,7 +257,7 @@ to creation-companies
     let i 0
     while [ i < n-class-of-products ] [
       let assuming-consumption item i p-cons-per-user-list ; FB: bisogna toglierlo e mettere il consumo specifico di ciascun bene
-      print p-cons-per-user-list
+      ;print p-cons-per-user-list
       set c-demand lput ( n-users * assuming-consumption ) c-demand  ; total demand (of the whole system)
       set i i + 1
     ]
@@ -368,6 +376,7 @@ to go
   ; finally, the company
   demand-assessment
   new-products-creation
+  ;check
   strategy-changing
 
   tick
@@ -378,6 +387,7 @@ to refresh-variables
   ask users [
     set buy-bool false
     set color grey
+    set tot-budget tot-budget + budget-of-period
   ]
   set best-products-list []
   set best-companies-list []
@@ -468,7 +478,8 @@ to utility-function-management
     [
 
       ; first, compute the utility assumiung that the stock is not relevant (how I like the stock)
-      set p-utility ( (p-quality * my-alpha) + (p-sustainability * my-beta) - (p-price * my-gamma)) * (p-acceptance * my-delta) * ((p-residual-life * my-omega) / p-shelf-life)
+
+      set p-init-utility ( (p-quality * my-alpha) + (p-sustainability * my-beta) - (p-price-norm * my-gamma)) * (p-acceptance * my-delta) * ((p-residual-life * my-omega) / p-shelf-life)
 
       ; second, i evaluate how much stock i have for each class of products
       let index-product position p-name p-name-list
@@ -479,12 +490,26 @@ to utility-function-management
 
       ; se ho uno stock target/massimo, calcolo quanto mi manca ad arrivare quel limite e moltiplico quel valore per l'utilità:
       ; se mi mancano tanti prodotti della categoria i--> questo calcolo amplificherà la propensione all'acquisto per quello specifico prodotto
-      ; se per una data categoria, ho lo stock che si avvicina al limite --> questo calcolo diminuirà la propensione all'acquisto
+      ; se per una data categoria, ho lo stock che si avvicina al limite --> questo calcolo diminuirà l'utilità
       ; se ho più prodotti rispetto allo stock target,  (1 - i-stock / my-stock-threshold) sarà negativo, di conseguenza prendo il valore 0
       ; così, aggiungiamo un vincolo sui valori che può assumere l'utilità che deve essere >=0
-      let stock-ratio 1 - i-stock / i-stock-threshold
 
-      set p-utility p-utility * ( stock-ratio ) ; FB - fate un bel commentoe per ricordare che cosa voglia dre quest cosa qui, altrimenti me ne dimentico anche io
+      ;let missing-stock 1 - i-stock / i-stock-threshold
+
+      ;;;;PROVA
+      let adjustment-factor 0
+      if (i-stock / i-stock-threshold) <= 1 [
+        set adjustment-factor ( 1 +  (1 - i-stock / i-stock-threshold) )  ; Amplifica proporzionalmente a quanto manca per raggiungere il threshold
+      ]
+
+      ; Se stock-ratio è maggiore o uguale a 1, smorza p-utility
+      if (i-stock / i-stock-threshold) > 1 [
+        set adjustment-factor 1 - ((i-stock / i-stock-threshold ) - 1); Smorza in modo che il valore non sia mai negativo
+      ]
+
+
+
+      set p-utility p-init-utility * ( adjustment-factor ) ; FB - fate un bel commentoe per ricordare che cosa voglia dre quest cosa qui, altrimenti me ne dimentico anche io
 
       set utilities-list lput p-utility utilities-list
       set p-IDs-list lput p-ID p-IDs-list
@@ -525,19 +550,22 @@ to utility-function-management
     let index-product position ( [ p-name ] of one-of chosen-product ) p-name-list ;FB - commentare per ricordare
     let i-stock item index-product my-stock
     let i-stock-threshold item index-product p-stock-threshold-list
+    let i-price [p-price] of one-of chosen-product
     ;let stock-ratio max list ( 1 - i-stock / i-stock-threshold ) 0
     ;let stock-ratio  1 - i-stock / stock-threshold
 
-    if i-stock / i-stock-threshold <= (utility-of-best-product * trigger) [
+
+;    if (i-stock / i-stock-threshold <= (utility-of-best-product * trigger)) and (i-price <= tot-budget) [
+    if (i-price <= tot-budget) [
       set buy-bool True ; the user buys an item
       set color pink
       ;print (word "tick" ticks word "who" [who] of self word " stock-ratio "(i-stock / i-stock-threshold) word "  utility-of-best-product * trigger  " (utility-of-best-product * trigger) )
 
-
       set chosen-product one-of chosen-product
       let chosen-company companies with [c-ID = [owner-ID] of chosen-product ]
-;        print ( [p-name ]of chosen-product)
-;        print (word "tick " ticks " stock-i pre acquisto: " stock)
+
+        print (word "budget-pre-acquisto: "tot-budget)
+        set tot-budget tot-budget - ([p-price] of chosen-product)
 
 
       set stock replace-item index-product stock ( i-stock + 1 )
@@ -557,6 +585,7 @@ to utility-function-management
 
       ask chosen-product [ die ]
     ]
+      print (word "tick: " ticks " who" [who] of self " i "index-product " stock-ratio: "precision (i-stock / i-stock-threshold) 2 " i-stock: " precision i-stock  2 " i-stock-threshold: " precision i-stock-threshold 2 "  result ut*trig " precision (utility-of-best-product * trigger) 2 "  utility-of-best-product " (precision utility-of-best-product 2) "  trigger: "trigger " buy-bool "buy-bool "budget-post-acquisto: "tot-budget)
     ]
   ]
 
@@ -612,6 +641,9 @@ to strategy-reprocess
           if (p-waste > 0)
           [
           let n-class-of-products-to-waste ceiling (n-class-of-products-to-transform * p-waste)
+
+          set wasted-prod n-class-of-products-to-waste
+          set wasted-prod-cum wasted-prod-cum + wasted-prod
 
           ask n-of n-class-of-products-to-waste products [die]
           ;print (word "CIAO " p-name-to-be-transformed word "total-products: "total-products word "  n-class-of-products-to-transform: " n-class-of-products-to-transform word "  n-class-of-products-to-waste: " n-class-of-products-to-waste word "  prodotti rimasti: " count products)
@@ -770,9 +802,17 @@ to new-products-creation
 
 end
 
+to check
+  let total-products count products
+  let primary-prod-1 count products with [primary-prod = 1]
+  let primary-prod-0 count products with [primary-prod = 0]
+  ifelse total-products = (primary-prod-1 + primary-prod-0)
+  [ print "ok" ]
+  [ print "error" ]
+end
+
 
 to strategy-changing
-
 
 
 end
@@ -885,9 +925,9 @@ HORIZONTAL
 
 MONITOR
 1005
-24
+113
 1103
-85
+174
 Mean price
 precision mean ( [p-price] of products ) 2
 17
@@ -896,9 +936,9 @@ precision mean ( [p-price] of products ) 2
 
 MONITOR
 1005
-111
+200
 1163
-172
+261
 Mean sustainability
 precision mean [ p-sustainability ] of products  2
 17
@@ -907,11 +947,11 @@ precision mean [ p-sustainability ] of products  2
 
 MONITOR
 1007
-193
-1181
-254
-Mean Stock of Products
-precision mean [ sum stock ] of users 2
+282
+1188
+343
+Avg Stock of Products
+precision mean [ mean stock ] of users 2
 17
 1
 15
@@ -949,7 +989,7 @@ true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot count users with [ buy-bool ]"
+"default" 1.0 0 -16777216 true "" "plot count users with [ buy-bool = true]"
 
 PLOT
 663
@@ -969,22 +1009,11 @@ false
 PENS
 "default" 1.0 0 -16777216 true "" "plot mean [ sum stock ] of users"
 
-MONITOR
-16
-188
-191
-249
-n-class-of-products
-n-class-of-products
-0
-1
-15
-
 SWITCH
-20
-259
-123
-292
+18
+194
+121
+227
 debug
 debug
 1
@@ -1020,10 +1049,10 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot count products"
 
 MONITOR
-1315
-91
-1441
-136
+1354
+216
+1480
+261
 number of products
 count products
 17
@@ -1032,9 +1061,9 @@ count products
 
 PLOT
 985
-339
+428
 1208
-514
+603
 N-products reprocessed vs normal
 NIL
 NIL
@@ -1043,18 +1072,18 @@ NIL
 0.0
 10.0
 true
-false
+true
 "" ""
 PENS
 "default" 1.0 0 -16777216 true "" "plot count products"
-"pen-1" 1.0 0 -2139308 true "" "plot count products with [primary-prod = 1]"
-"pen-2" 1.0 0 -10899396 true "" "plot count products with [primary-prod = 0]"
+"primary" 1.0 0 -2139308 true "" "plot count products with [primary-prod = 1]"
+"reprocessed" 1.0 0 -10899396 true "" "plot count products with [primary-prod = 0]"
 
 SLIDER
-30
-331
-202
-364
+18
+242
+190
+275
 trigger-baseline
 trigger-baseline
 0
@@ -1066,19 +1095,82 @@ NIL
 HORIZONTAL
 
 SLIDER
-31
-375
-203
-408
+19
+286
+191
+319
 user-initial-stock
 user-initial-stock
 0
 50
-5.0
+9.0
 1
 1
 NIL
 HORIZONTAL
+
+MONITOR
+1007
+349
+1134
+418
+wasted-prod 
+wasted-prod
+17
+1
+17
+
+PLOT
+1228
+427
+1428
+577
+wasted-products
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot wasted-prod "
+"pen-1" 1.0 0 -10899396 true "" "plot wasted-prod-cum"
+
+MONITOR
+1009
+29
+1066
+74
+buyers
+count users with [buy-bool = true]
+17
+1
+11
+
+MONITOR
+1205
+264
+1387
+325
+MIN stock of products
+precision min [ min stock ] of users 2
+17
+1
+15
+
+MONITOR
+1205
+325
+1390
+386
+MAX stock of products
+precision max [ max stock ] of users 2
+17
+1
+15
 
 @#$#@#$#@
 ## NOTA BENE
@@ -1097,12 +1189,28 @@ HORIZONTAL
 - threshold troppo bassa--> gli utenti non comprano
 - limite di acquistare 1 solo prodotto per volta è limitante
 - dimensionamento domanda aziende è troppo basso: aziende non producono-> utenti non comprano-> ci sono pochi proodotti e tutti riprocessaati
+- al momento viene prima selezionato il prodotto migliore (in termini di utilità e che quindi esclude la necessità effettiva di tale prodotto) e poi l'utente decide se comprarlo o meno
+- qualora il prodotto risulta sotto la threshold, non viene comunque comprato--> è sbagliata la funzione!!!
+- viene selezionata solo frutta e verdura: questo problema deriva dal fatto che la variabile  "missing-stock" smorza l'utilità di prodotti ampiamente presenti a stock, ma non amplifica quella di prodotti assenti (perché assume valore massimo =1)
+
+- POSSIBILE IDEA: 
+1. prima dobbiamo selezionare la categoria per la  quale siamo più lontani dalla threshold
+2. solo per quella categoria considerata, valuto il paniere di prodotti e seleziono quello migliore. 
+3. so che ho bisogno del prodotto, l'ho selezionato->  verifico di avere abbastanza budget 
+
 
 ## Cose modificate rispetto all'ultimo incontro: 
 - Cambiato il modo in cui settare prezzo, qualità, sostenibilità dei prodotti nuovi generati: introdotte price-variability,...etc
 - in fase di normalizzazione delle variabili usate per calcolare l'utilità, se il valore min e il valore max sono uguali, allora settiamo il valore normalizzato a 0.5 (Non più 1 come prima)
 - abbiamo rimosso i valori normalizzati di p-sustainability...etc in quanto i valori estremi (p-sustainability min e max), una volta normalizzati assumevano rispettivamente valori = 0 e 1, creando problemi nella funzione di utilità
+- abbiamo lasciato i valori normalizzati solo per p-price
 - la stock-threshold non è più uguale per ogni utente ma è randomica (compresa tra 0.5 e 1 per renderla più sensata con il food)
+- abbiamo aggiunto le scorte di sicurezza nella domanda: hanno avuto un grande impatto
+- abbiamo introdotto un check (prodotti primari  +  riprocessati = totali)
+- aggiunto un budget
+- introdotto un adjustement factor che va a sostituire questa parte: 
+questa: p-utility p-init-utility * ( 1 - i-stock/i-stock-threshold )
+con: p-utility p-init-utility * ( adjustment-factor )
 
 
 ## IPOTESI MODELLISTICHE (da mettere in ordine per tipo di agente)

@@ -103,6 +103,8 @@ globals [
   primary-prod-list
   p-stock-threshold-list
 
+  product-classes-counts
+
 ]
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -143,6 +145,7 @@ to init-globals
   set p-id-counter 0   ; to assing the correct and increasing p-id to each product that is generated
   set wasted-prod 0
   set wasted-prod-cum 0
+  set product-classes-counts []
 
 end
 
@@ -223,7 +226,7 @@ to creation-users
     set delta 1                 ;FIX acceptance
     set omega random-float 1    ;RL/SL
     set stock n-values n-class-of-products [random user-initial-stock]
-    print stock
+
     ; each user has a stock of n-class-of-products (number of lines of the categories of products) and sets the initial stock of each category as a random  number between 0 and 5
 
     set buy-bool False                         ; at the beginning they does not buy
@@ -378,6 +381,7 @@ to go
   new-products-creation
   ;check
   strategy-changing
+  ;update-histogram
 
   tick
 end
@@ -564,7 +568,7 @@ to utility-function-management
       set chosen-product one-of chosen-product
       let chosen-company companies with [c-ID = [owner-ID] of chosen-product ]
 
-        print (word "budget-pre-acquisto: "tot-budget)
+
         set tot-budget tot-budget - ([p-price] of chosen-product)
 
 
@@ -585,7 +589,7 @@ to utility-function-management
 
       ask chosen-product [ die ]
     ]
-      print (word "tick: " ticks " who" [who] of self " i "index-product " stock-ratio: "precision (i-stock / i-stock-threshold) 2 " i-stock: " precision i-stock  2 " i-stock-threshold: " precision i-stock-threshold 2 "  result ut*trig " precision (utility-of-best-product * trigger) 2 "  utility-of-best-product " (precision utility-of-best-product 2) "  trigger: "trigger " buy-bool "buy-bool "budget-post-acquisto: "tot-budget)
+      ;print (word "tick: " ticks " who" [who] of self " i "index-product " stock-ratio: "precision (i-stock / i-stock-threshold) 2 " i-stock: " precision i-stock  2 " i-stock-threshold: " precision i-stock-threshold 2 "  result ut*trig " precision (utility-of-best-product * trigger) 2 "  utility-of-best-product " (precision utility-of-best-product 2) "  trigger: "trigger " buy-bool "buy-bool "budget-post-acquisto: "tot-budget)
     ]
   ]
 
@@ -831,6 +835,30 @@ to-report safe-divide [numerator denominator]
   ]
   report numerator / denominator
 end
+
+;to update-histogram
+;  clear-all
+;  reset-ticks
+;set product-classes-counts n-values n-class-of-products [0]
+;ask products [
+;    ; Incrementa il conteggio per la classe del prodotto
+;    let i 0
+;    while [i <= n-class-of-products]
+;    [
+;    set product-classes-counts replace-item i product-classes-counts (item i product-classes-counts + 1)
+;    set i i + 1
+;  ]
+;  ]
+;
+;  clear-plot
+;  let k 0
+;  while [k <= length product-classes-counts]
+;  [
+;    set k k + 1
+;    set-current-plot-pen (word "Classe-" k)
+;  ]
+;
+;end
 @#$#@#$#@
 GRAPHICS-WINDOW
 289
@@ -924,10 +952,10 @@ agents
 HORIZONTAL
 
 MONITOR
-1005
-113
-1103
-174
+997
+18
+1095
+79
 Mean price
 precision mean ( [p-price] of products ) 2
 17
@@ -935,10 +963,10 @@ precision mean ( [p-price] of products ) 2
 15
 
 MONITOR
-1005
-200
-1163
-261
+997
+105
+1155
+166
 Mean sustainability
 precision mean [ p-sustainability ] of products  2
 17
@@ -946,10 +974,10 @@ precision mean [ p-sustainability ] of products  2
 15
 
 MONITOR
-1007
-282
-1188
-343
+999
+187
+1180
+248
 Avg Stock of Products
 precision mean [ mean stock ] of users 2
 17
@@ -974,24 +1002,6 @@ NIL
 1
 
 PLOT
-665
-14
-975
-177
-Buyers
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -16777216 true "" "plot count users with [ buy-bool = true]"
-
-PLOT
 663
 181
 976
@@ -1007,7 +1017,7 @@ true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot mean [ sum stock ] of users"
+"default" 1.0 0 -16777216 true "" "plot mean [ mean stock ] of users"
 
 SWITCH
 18
@@ -1049,10 +1059,10 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot count products"
 
 MONITOR
-1354
-216
-1480
-261
+146
+380
+272
+425
 number of products
 count products
 17
@@ -1110,10 +1120,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-1007
-349
-1134
-418
+999
+254
+1126
+323
 wasted-prod 
 wasted-prod
 17
@@ -1140,17 +1150,6 @@ PENS
 "pen-1" 1.0 0 -10899396 true "" "plot wasted-prod-cum"
 
 MONITOR
-1009
-29
-1066
-74
-buyers
-count users with [buy-bool = true]
-17
-1
-11
-
-MONITOR
 1205
 264
 1387
@@ -1172,13 +1171,47 @@ precision max [ max stock ] of users 2
 1
 15
 
+PLOT
+663
+13
+982
+181
+N. of buyers
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot count (users with [buy-bool = true])"
+
+PLOT
+289
+361
+489
+511
+Existing Products per category
+Product Categories
+Quantity
+0.0
+10.0
+0.0
+10.0
+true
+false
+"\n" ""
+PENS
+"Classe-1" 1.0 1 -16777216 true "" "plot .count products with [p-name = item 0 p-name-list]"
+"Classe-" 1.0 0 -1184463 true "" ""
+
 @#$#@#$#@
 ## NOTA BENE
 - nota: netlogo è case sensitive, quindi può essere necessario implementare un check sul nome dei prodotti inseriti nella matrice
 - al momento la produzione deriva da una domanda (probabilmente sbagliata). moltiplicando i-production *  20 o simili, si ottengono risultati più realistici
-
-### IN SOSPESO
-- trigger: decidere cosa fare
 
 
 ### FUTURE IMPLEMENTATION
@@ -1211,6 +1244,7 @@ precision max [ max stock ] of users 2
 - introdotto un adjustement factor che va a sostituire questa parte: 
 questa: p-utility p-init-utility * ( 1 - i-stock/i-stock-threshold )
 con: p-utility p-init-utility * ( adjustment-factor )
+- il trigger è stato tolto
 
 
 ## IPOTESI MODELLISTICHE (da mettere in ordine per tipo di agente)

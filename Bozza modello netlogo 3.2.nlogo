@@ -160,9 +160,9 @@ to import-data
   set p-stock-threshold-list []
 
   file-close-all
-  file-open "Input_data_products.csv"
+  file-open "Input_data_products_OLD.csv"
   let result csv:from-row file-read-line
-  let m2 csv:from-file "Input_data_products.csv"
+  let m2 csv:from-file "Input_data_products_OLD.csv"
   set n-class-of-products ( length m2 - 1 )
   while [ not file-at-end? ]
   [
@@ -189,7 +189,7 @@ end
 
 to read-file-matrix
     file-close-all
-    file-open "matrice prodotti.csv"
+    file-open "Reprocessing_matrix.csv"
     set m1 []
     let i 0
     while [ not file-at-end? ] [

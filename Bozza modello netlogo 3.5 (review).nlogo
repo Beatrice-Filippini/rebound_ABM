@@ -12,7 +12,6 @@ products-own [
   p-price
   p-sustainability
   p-quality
-  p-acceptance
   p-shelf-life
   p-residual-life
   p-RL/SL-ratio
@@ -26,7 +25,6 @@ products-own [
   p-price-norm
   p-sustainability-norm
   p-quality-norm
-  p-acceptance-norm
   p-RL/SL-ratio-norm
   p-utility
   p-init-utility
@@ -43,7 +41,6 @@ users-own
   beta                 ;linked to sustainability
   gamma                ;linked to price
   alpha                ;linked to quality
-  delta                ;linked to acceptance
   omega                ;linked to RL/SL
 
   stock                ;this is the stock of products of each user (it is a list of (n-class-of-products) items)
@@ -103,7 +100,6 @@ globals [
   p-sustainability-max-list
   p-quality-min-list
   p-quality-max-list
-  p-acceptance-list
   p-shelf-life-list
   p-residual-life-list
   p-cons-per-user-list
@@ -113,6 +109,8 @@ globals [
   c-security-stock
   p-RL-baseline
   p-RL-upper-lim
+
+  counter-sales
 
 ]
 
@@ -186,7 +184,6 @@ to import-data
   set p-sustainability-max-list []
   set p-quality-min-list []
   set p-quality-max-list []
-  set p-acceptance-list []
   set p-shelf-life-list []
   set p-residual-life-list []
   set p-cons-per-user-list []
@@ -205,20 +202,19 @@ to import-data
 
     ;insert the imported data into the correct list
     set p-name-list lput item 0 row p-name-list
-    set p-price-min-list lput item 9 row p-price-min-list
-    set p-price-max-list lput item 10 row p-price-max-list
-    set p-sustainability-min-list lput item 11 row p-sustainability-min-list
-    set p-sustainability-max-list lput item 12 row p-sustainability-max-list
-    set p-quality-min-list lput item 13 row p-quality-min-list
-    set p-quality-max-list lput item 14 row p-quality-max-list
-    set p-acceptance-list lput item 4 row p-acceptance-list
-    set p-shelf-life-list lput item 5 row p-shelf-life-list
-    set p-residual-life-list lput item 6 row p-residual-life-list
-    ;set p-cons-per-user-list lput item 21 row p-cons-per-user-list
+    set p-price-min-list lput item 8 row p-price-min-list
+    set p-price-max-list lput item 9 row p-price-max-list
+    set p-sustainability-min-list lput item 10 row p-sustainability-min-list
+    set p-sustainability-max-list lput item 11 row p-sustainability-max-list
+    set p-quality-min-list lput item 12 row p-quality-min-list
+    set p-quality-max-list lput item 13 row p-quality-max-list
+    set p-shelf-life-list lput item 4 row p-shelf-life-list
+    set p-residual-life-list lput item 5 row p-residual-life-list
+    ;set p-cons-per-user-list lput item 14 row p-cons-per-user-list
     ;set p-cons-per-user-list [0.05 0.075 0.04 0.04 0.075 0.065 0.05]
     set p-cons-per-user-list [0.15 0.20 0.1 0.05 0.2 0.15 0.1]
-    set p-color-list lput item 22 row p-color-list
-    set p-stock-threshold-list lput item 23 row p-stock-threshold-list
+    set p-color-list lput item 15 row p-color-list
+    set p-stock-threshold-list lput item 16 row p-stock-threshold-list
   ]
   file-close
 end
@@ -236,13 +232,12 @@ to creation-users
     set beta random-float 1     ;sustainability weight
     set gamma random-float 1    ;price weight
     set alpha random-float 1    ;quality weight
-    set delta 1                 ;FIX acceptance weight
     set omega random-float 1    ;RL/SL weight
 
     ; each user has a stock of (n-class-of-products) items and sets the initial stock of each class (each element of the list) as a random number between 0 and 5
     set stock n-values n-class-of-products [random 5]
-    set buy-bool False                         ; at the beginning the user does not buy
-    ;set trigger trigger-baseline + random 5   ;CHECK
+    set buy-bool False                         ;at the beginning the user does not buy
+    set trigger random-float trigger-max       ;the trigger represents the willingness to buy, therefore it is set between 0 and trigger-max: this means that the user can choose to buy until the 200% of its stock threshold
     set budget-of-period (5 + random 10)       ;there is a periodic budget per person: it depends on the context (fashion vs food). The budget accumulates and doesn't reset after each tick
     set tot-budget 0                           ;cumulated budget
 
@@ -281,7 +276,6 @@ to creation-companies
                                                                                       ;The lower c-price will be, the cheaper the company will be and viceversa
     set c-sustainability  random-float 1
     set c-quality  random-float 1
-    ;c-acceptance is not set as it is a feature attributable only to users
 
     ;here the c-memory is initialized
     ;At the beginning of the simulation, the sales hystory of the previous 10 periods, is hypothesised as equal to the demand just assumed above.
@@ -352,7 +346,6 @@ to creation-companies
         let p-quality-variability ( item i p-quality-max-list - item i p-quality-min-list )    ;review: decide to keep it or not
         set p-quality item i p-quality-min-list + (p-quality-variability * [ c-quality ] of my-company)
 
-        set p-acceptance item i p-acceptance-list  ;review: decide to keep it or not
         set p-shelf-life item i p-shelf-life-list
         set p-residual-life (item i p-shelf-life-list * p-RL-baseline) + ( (random-float p-RL-upper-lim )* item i p-shelf-life-list )
         set p-RL/SL-ratio p-residual-life / p-shelf-life
@@ -367,11 +360,10 @@ to creation-companies
         set p-price-norm 0
         set p-sustainability-norm 0
         set p-quality-norm 0
-        set p-acceptance-norm 0
         set p-RL/SL-ratio-norm 0
         set p-utility 0
         set p-init-utility 0
-        ;print ( word "p-name "p-name" p-price"p-price " p-sust "p-sustainability  "  p-quality  "p-quality "  p-acceptance  "p-acceptance )
+        ;print ( word "p-name "p-name" p-price"p-price " p-sust "p-sustainability  "  p-quality  "p-quality "  )
 
       ]
       set i i + 1
@@ -453,7 +445,7 @@ end
 ;This will provide more stability to the model.
 to get-normalized-status
 
-  ;compute for each product the normalized score for price, sustainabilty, quality and acceptance
+  ;compute for each product the normalized score for price, sustainabilty, quality
   ask products
   [
     let my-name p-name
@@ -465,8 +457,6 @@ to get-normalized-status
     let min-price min [ p-price ] of products with [ p-name = my-name ]
     let max-quality max [ p-quality ] of products with [ p-name = my-name ]
     let min-quality min [ p-quality ] of products with [ p-name = my-name ]
-    let max-acceptance max [ p-acceptance ] of products with [ p-name = my-name ]
-    let min-acceptance min [ p-acceptance ] of products with [ p-name = my-name ]
     let min-p-RL/SL-ratio min [p-RL/SL-ratio] of products with [ p-name = my-name ]
     let max-p-RL/SL-ratio max [p-RL/SL-ratio] of products with [ p-name = my-name ]
 
@@ -474,7 +464,6 @@ to get-normalized-status
     ifelse max-sustainability - min-sustainability != 0 [ set p-sustainability-norm (p-sustainability - min-sustainability) / (max-sustainability - min-sustainability) ] [ set p-sustainability-norm 0.5 ]  ;REVIEW
     ifelse max-price - min-price != 0 [ set p-price-norm (p-price - min-price) / (max-price - min-price) ] [ set p-price-norm 0.5 ]
     ifelse max-quality - min-quality != 0 [ set p-quality-norm (p-quality - min-quality) / (max-quality - min-quality) ] [ set p-quality-norm 0 ]  ;review: decidere cosa fare con quality
-    set p-acceptance-norm 1   ;review
     ifelse max-p-RL/SL-ratio - min-p-RL/SL-ratio != 0 [ set p-RL/SL-ratio-norm (p-RL/SL-ratio - min-p-RL/SL-ratio) / (max-p-RL/SL-ratio - min-p-RL/SL-ratio) ] [ set p-RL/SL-ratio-norm 0.5 ]
   ]
 
@@ -501,7 +490,6 @@ to utility-function-management
     let my-beta beta ; sust-weight
     let my-gamma gamma ;price-weight
     let my-alpha alpha ; quality-weight
-    let my-delta delta ; acceptance-weight
     let my-omega omega ; residual life-weight
 
     ; initialize global lists
@@ -519,7 +507,7 @@ to utility-function-management
 
       ; first, compute the utility assumiung that the quantity of stock of the class of products is not relevant (without considering the effective need)
 
-      set p-init-utility ( (p-quality-norm * my-alpha) + (p-sustainability-norm * my-beta) - (p-price-norm * my-gamma)) * (p-acceptance-norm * my-delta) * ((p-residual-life * my-omega) / p-shelf-life)
+      set p-init-utility ( (p-quality-norm * my-alpha) + (p-sustainability-norm * my-beta) - (p-price-norm * my-gamma)) * ((p-residual-life * my-omega) / p-shelf-life)
 
       ; second, i evaluate how much stock i have for each class of products
       let index-product position p-name p-name-list
@@ -552,7 +540,7 @@ to utility-function-management
 
 
 
-      set p-utility p-init-utility * ( adjustment-factor ) ; FB - fate un bel commentoe per ricordare che cosa voglia dre quest cosa qui, altrimenti me ne dimentico anche io
+      set p-utility p-init-utility * ( adjustment-factor )
 
       set utilities-list lput p-utility utilities-list
       set p-whos-list lput who p-whos-list
@@ -580,9 +568,6 @@ to utility-function-management
 ;      set p-net-revenues-list lput ( ( [p-price] of one-of products with [who = last best-products-list]) - ([p-production-cost] of one-of products with [who = last best-products-list])) p-net-revenues-list
 ;    ]
 
-;FB - vi prego commenatemi ogni linea di codice, aiutatemi ad aiutarvi
-; FB - commentate lungamente sopra ogni funzione che cosa fa e quali sono i processi
-; FB - fatevi un disegnino carta e penna di pgni funzione che cosa fa, tipo un diagramma di flusso
 
     if debug and who < 5 [
       print ( word "who: " who " - s: " precision stock 2 "  - st:" precision p-stock-threshold 2 " - u:" precision utility-of-best-product 2 " t:" precision trigger 2 " |||||| left:" precision ( stock / p-stock-threshold ) 2 " <= right:" precision ( utility-of-best-product * trigger ) 2)
@@ -840,7 +825,6 @@ to new-products-creation
 
         let p-quality-variability ( item j p-quality-max-list - item j p-quality-min-list )
         set p-quality item j p-quality-min-list + (p-quality-variability * [ c-quality ] of my-company) ;review
-        set p-acceptance item j p-acceptance-list
 
         ;p-shelf-life is assumed as the same for all products of the same class
         ;p-residual-life represents the remaining life of the product at the time it arrives at the shop. It is therefore heterogeneous as it takes into account all those real factors that may cause
@@ -961,7 +945,7 @@ n-companies
 n-companies
 1
 20
-2.0
+3.0
 1
 1
 agents
@@ -976,7 +960,7 @@ n-users
 n-users
 10
 50
-15.0
+45.0
 5
 1
 agents
@@ -985,7 +969,7 @@ HORIZONTAL
 MONITOR
 997
 18
-1095
+1170
 79
 Mean price
 precision mean ( [p-price] of products ) 2
@@ -994,10 +978,10 @@ precision mean ( [p-price] of products ) 2
 15
 
 MONITOR
-997
-105
-1155
-166
+998
+82
+1169
+143
 Mean sustainability
 precision mean [ p-sustainability ] of products  2
 17
@@ -1005,10 +989,10 @@ precision mean [ p-sustainability ] of products  2
 15
 
 MONITOR
-999
-187
-1180
-248
+998
+153
+1170
+214
 Avg Stock of Products
 precision mean [ mean stock ] of users 2
 17
@@ -1101,10 +1085,10 @@ count products
 15
 
 PLOT
-985
-428
-1208
-603
+989
+347
+1232
+522
 N-products reprocessed vs normal
 NIL
 NIL
@@ -1125,21 +1109,21 @@ SLIDER
 242
 190
 275
-trigger-baseline
-trigger-baseline
+trigger-max
+trigger-max
 0
-100
-1.0
-1
+2
+2.0
+0.1
 1
 NIL
 HORIZONTAL
 
 MONITOR
-999
-254
-1126
-323
+998
+219
+1170
+288
 wasted-prod 
 wasted-prod
 17
@@ -1147,10 +1131,10 @@ wasted-prod
 17
 
 PLOT
-1228
-427
-1442
-601
+1238
+346
+1452
+520
 wasted-products
 NIL
 NIL
@@ -1165,10 +1149,10 @@ PENS
 "default" 1.0 0 -955883 true "" "plot wasted-prod "
 
 MONITOR
-1205
-264
-1387
-325
+1186
+157
+1368
+218
 MIN stock of products
 precision min [ min stock ] of users 2
 17
@@ -1176,10 +1160,10 @@ precision min [ min stock ] of users 2
 15
 
 MONITOR
-1205
-325
-1390
-386
+1187
+222
+1368
+283
 MAX stock of products
 precision max [ max stock ] of users 2
 17
@@ -1281,18 +1265,39 @@ count products with [p-name = item 6 p-name-list]
 1
 11
 
+MONITOR
+1206
+21
+1270
+66
+n-buyers
+count (users with [buy-bool = true])
+17
+1
+11
+
 @#$#@#$#@
 ## NOTA BENE
 - nota: netlogo è case sensitive, quindi può essere necessario implementare un check sul nome dei prodotti inseriti nella matrice
 - in strategy-reprocessing: per chiamare l'elemento i,j devo scrivere "item j item i m1"
 
+##NOTE PER LA TESI
+- vanno bene le SS per come sono impostate ora: giustificarle poi in tesi
+--> va bene tenerle ma bisogna giustificarle bene altrimenti sembra un escamotage per far quadrare i conti: 
+in caso di simulazioni con basse numerosità (pochi users e poche companies), se un utente in un tick non compra per cause aleatorie, la domanda media diminuisce di una quantità non trascurabile perchè 1 singolo utente ha un peso maggiore in questo caso rispetto al peso che avrebbe in modello con 100 utenti. 
+--> per evitare che con basse numerosità, un mancato acquisto generi instabilità, vengono inserite le SS per smorzare e filtrare il bullwhip effect.
+Senza le SS, un mancato acquisto, diminuirebbe la domanda media, e quindi lo storico, quindi la produzione e, se le companies non producono, gli utenti non posso comprare e l'effetto continua ad essere amplificato fino a quando ci si allontana troppo dal punto di equilibrio e stabilità. 
 
-### Problemi da risolvere
+
+## Problemi da risolvere
 
 #### problemi  minori
-- capire se usare net revenue o earnings-> ne consegue se tenere production cost o meno
-- capire cosa fare con p-quality e p-acceptance
-- capire se vanno bene le SS per come sono impostate ora
+- capire se usare net revenue o earnings-> settare production cost come detto durante incontro
+- teniamo p-quality: impostare p-quality come il production cost (perché deve dipendere chiaramente dal prezzo)
+-trigger compreso tra 0 e 2
+- inserire  strategy changing di companies per sostenibilità
+- impostare grafico con sostenibilità e numero di prodotti venduti (cum)
+
 
 #### problemi maggiori
 
@@ -1302,36 +1307,6 @@ count products with [p-name = item 6 p-name-list]
 	- capire se utilità e stock ratio possono essere negativi
 	- scegliere giusta equazione di acquisto
 	- capire ordine di grandezza giusto di trigger e stock threshold
-
-
-
-## Cose modificate rispetto all'ultimo incontro:
-
-- introdotto un adjustement factor che va a sostituire questa parte: 
-old: p-utility p-init-utility * ( 1 - i-stock/i-stock-threshold )
-new: p-utility p-init-utility * ( adjustment-factor )
-
-- il reprocessing avviene una volta superata una certa soglia: per il food è i 2/3; per il fashion è 0/ più bassa (se tenere una threshold != 0 e una =0 non è un problema a livello concettuale, sarebbe la soluzione più coerente con la realtà; tuttavia tenerle entrambe != 0 sarebbe più elegante)
-
-#### products
-- Cambiato il modo in cui settare prezzo, qualità, sostenibilità dei prodotti nuovi generati:  abbiamo introdotto price-variability,...etc
-	- let price-variability ( item j p-price-max-list - item j p-price-min-list ) 		* [ c-price ] of my-company
-	- set p-price item j p-price-min-list + ( random price-variability )
-- in fase di normalizzazione delle variabili usate per calcolare l'utilità, se il valore min e il valore max sono uguali, allora settiamo il valore normalizzato a 0.5 (Non più 1 come prima)
-- la stock-threshold non è più uguale per ogni utente ma è caratteristica di ogni classe di prodotti (ora viene importata dal csv)
-- abbiamo tolto p-id (che era ridontante rispetto al who) dal modello e dal csv e altre variabili non utili (come p-amount e primary prod) dal csv
-
-#### companies
-- abbiamo aggiunto le SCORTE DI SICUREZZA: hanno avuto un grande impatto (prima infatti, non essendoci SS, gli utenti finivano per non comprare nulla perché i prodotti non venivano generati)
-- abbiamo verificato in diversi punti il check compartimentale
-- la shelf life è uguale per tutti i prodotti della stessa classe che vengono generati: le aziende non competono su ciò
-- p-residual-life rappresenta la vita residua  del prodotto nel momento in cui quet'ultimo arriva a negozio. di conseguenza è eterogenea in quanto tiene conto di tutti quei fattori reali che possono causare l'arrivo del prodotto a negozio in un momento diverso da quando viene effettivamente manufactured (es: lead time, responsiveness of the company...etc).
-Per fare in modo che il prodotto rimanga competitivo, non deve passare troppo tempo da quando viene manufactured a quando raggiunge il negozio. di conseguenza il limite minimo per la RL viene settato all'80% della SL (e il massimo sarà il 100% della SL)
-Abbiamo ipotizzato che, senza questo  "stratagemma" RL/SL sarebbe stato un rapporto meno eterogeneo
-- 
-
-#### users
-- aggiunto aggiunto un budget per ogni utente
 
 
 ## IPOTESI MODELLISTICHE
@@ -1361,6 +1336,40 @@ Abbiamo ipotizzato che, senza questo  "stratagemma" RL/SL sarebbe stato un rappo
 - le aziende hanno capacità produttiva infinita
 - le scorte di sicurezza sono omogenee tra tutte le compagnie
 - la domanda prevista dalle compagnie si assume in linea con gli acquisti medi degi ultimi 10 periodi
+
+
+
+## Cose modificate rispetto all'ultimo incontro:
+
+- introdotto un adjustement factor che va a sostituire questa parte: 
+old: p-utility p-init-utility * ( 1 - i-stock/i-stock-threshold )
+new: p-utility p-init-utility * ( adjustment-factor )
+
+- il reprocessing avviene una volta superata una certa soglia: per il food è i 2/3; per il fashion è 0/ più bassa (se tenere una threshold != 0 e una =0 non è un problema a livello concettuale, sarebbe la soluzione più coerente con la realtà; tuttavia tenerle entrambe != 0 sarebbe più elegante)
+
+-tolto p-acceptance
+
+#### products
+- Cambiato il modo in cui settare prezzo, qualità, sostenibilità dei prodotti nuovi generati:  abbiamo introdotto price-variability,...etc
+	- let price-variability ( item j p-price-max-list - item j p-price-min-list ) 		* [ c-price ] of my-company
+	- set p-price item j p-price-min-list + ( random price-variability )
+- in fase di normalizzazione delle variabili usate per calcolare l'utilità, se il valore min e il valore max sono uguali, allora settiamo il valore normalizzato a 0.5 (Non più 1 come prima)
+- la stock-threshold non è più uguale per ogni utente ma è caratteristica di ogni classe di prodotti (ora viene importata dal csv)
+- abbiamo tolto p-id (che era ridontante rispetto al who) dal modello e dal csv e altre variabili non utili (come p-amount e primary prod) dal csv
+- abbiamo normalizzato anche il ratio RL/SL (in modo da essere coerenti con gli altri attributi contenuti nella funzione di utilità)
+
+#### companies
+- abbiamo aggiunto le SCORTE DI SICUREZZA: hanno avuto un grande impatto (prima infatti, non essendoci SS, gli utenti finivano per non comprare nulla perché i prodotti non venivano generati)
+- abbiamo verificato in diversi punti il check compartimentale
+- la shelf life è uguale per tutti i prodotti della stessa classe che vengono generati: le aziende non competono su ciò
+- p-residual-life rappresenta la vita residua  del prodotto nel momento in cui quet'ultimo arriva a negozio. di conseguenza è eterogenea in quanto tiene conto di tutti quei fattori reali che possono causare l'arrivo del prodotto a negozio in un momento diverso da quando viene effettivamente manufactured (es: lead time, responsiveness of the company...etc).
+Per fare in modo che il prodotto rimanga competitivo, non deve passare troppo tempo da quando viene manufactured a quando raggiunge il negozio. di conseguenza il limite minimo per la RL viene settato all'80% della SL (e il massimo sarà il 100% della SL)
+Abbiamo ipotizzato che, senza questo  "stratagemma" RL/SL sarebbe stato un rapporto meno eterogeneo
+
+
+#### users
+- aggiunto aggiunto un budget per ogni utente
+
 
 
 
@@ -1740,6 +1749,30 @@ NetLogo 6.4.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
+<experiments>
+  <experiment name="prova FB" repetitions="2" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="1000"/>
+    <metric>mean [ c-price ] of companies</metric>
+    <metric>mean [ c-sustainability ] of companies</metric>
+    <metric>mean [ c-quality ] of companies</metric>
+    <metric>counter-sales</metric>
+    <enumeratedValueSet variable="n-companies">
+      <value value="2"/>
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="debug">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="n-users">
+      <value value="15"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="trigger-baseline">
+      <value value="1"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default

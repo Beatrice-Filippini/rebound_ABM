@@ -38,10 +38,9 @@ products-own [
 
 users-own
 [
-  alpha                ;linked to quality
-  beta                 ;linked to sustainability
-  gamma                ;linked to price
-  weight-RL/SL                ;linked to RL/SL
+  alpha-norm                ;linked to quality
+  beta-norm                 ;linked to sustainability
+  gamma-norm                ;linked to price
 
   stock                ;this is the stock of products of each user (it is a list of (n-class-of-products) items)
   trigger              ;Review:  used to evaluate whether to buy
@@ -111,6 +110,7 @@ globals [
   counter-sales
   delta
   omega
+  exponent
 
 ]
 
@@ -156,6 +156,7 @@ to init-globals
 
   set delta 0.1
   set omega 0.1
+  set exponent 0.5
   ;c-security-stock will be set afterwards
 end
 
@@ -231,10 +232,23 @@ to creation-users
     set shape "person"
     set color grey
     set utility-of-best-product 0
-    set beta random-float 1     ;sustainability weight
-    set gamma random-float 1    ;price weight
-    set alpha random-float 1    ;quality weight
-    set weight-RL/SL random-float 1    ;RL/SL weight
+
+
+    let alpha random-float 1    ;quality weight
+    let beta random-float 1     ;sustainability weight
+    let gamma random-float 1    ;price weight
+    set alpha alpha
+    set beta beta
+    set gamma gamma
+    let sum-weights 0
+    set sum-weights alpha + beta + 1
+;    set alpha-norm alpha / sum-weights
+;    set beta-norm beta / sum-weights
+;    set gamma-norm 1 - (alpha-norm + beta-norm)
+    set alpha-norm random-float 1
+    set beta-norm random-float 1
+  set gamma-norm random-float 1
+
 
     ; each user has a stock of (n-class-of-products) items and sets the initial stock of each class (each element of the list) as a random number between 0 and 5
     set stock n-values n-class-of-products [random 5]
@@ -492,10 +506,9 @@ to utility-function-management
   ; first we define the weights for each user
   ask users
   [
-    let my-beta beta ; sust-weight
-    let my-gamma gamma ;price-weight
-    let my-alpha alpha ; quality-weight
-    let my-weight-RL/SL weight-RL/SL ; residual life-weight
+    let my-alpha-norm alpha-norm ; quality-weight
+    let my-beta-norm beta-norm ; sust-weight
+    let my-gamma-norm gamma-norm ;price-weight
 
     ; initialize global lists
     set utilities-list []
@@ -512,7 +525,8 @@ to utility-function-management
 
       ; first, compute the utility assuming that the quantity of stock of the class of products is not relevant (without considering the effective need)
 
-      set p-utility ( (p-quality-norm * my-alpha) + (p-sustainability-norm * my-beta) - (p-price-norm * my-gamma)) * p-RL/SL-ratio-norm
+      set p-utility (   max list ( (p-quality-norm * my-alpha-norm) + (p-sustainability-norm * my-beta-norm) - (p-price-norm * my-gamma-norm)) 0  * p-RL/SL-ratio-norm  )  ^ exponent
+
 
       ; second, i evaluate how much stock i have for each class of products
       let index-product position p-name p-name-list
@@ -948,7 +962,7 @@ n-companies
 n-companies
 1
 20
-3.0
+12.0
 1
 1
 agents
@@ -963,7 +977,7 @@ n-users
 n-users
 10
 50
-45.0
+50.0
 5
 1
 agents
@@ -1103,8 +1117,8 @@ true
 true
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot count products"
-"primary" 1.0 0 -2139308 true "" "plot count products with [primary-prod = 1]"
+"default" 1.0 0 -16777216 true "" ";plot count products"
+"primary" 1.0 0 -2139308 true "" ";plot count products with [primary-prod = 1]"
 "reprocessed" 1.0 0 -10899396 true "" "plot count products with [primary-prod = 0]"
 
 SLIDER
@@ -1304,11 +1318,12 @@ Senza le SS, un mancato acquisto, diminuirebbe la domanda media, e quindi lo sto
 
 #### problemi  minori
 - capire se usare net revenue o earnings-> settare production cost come detto durante incontro
-- inserire  strategy changing di companies per sostenibilità
+- inserire  STRATEGY CHANGING di companies per sostenibilità
 - impostare grafico con sostenibilità e numero di prodotti venduti
 - capire perché normalizzando i valori si compra di meno (x giustificare nella tesi)
 - come cambia quality una volta che riprocessiamo?
-	- nel food: 
+	- HP: nel food-> diminuisce sempre perche aggiungo additivi
+	- HP: nel fashion-> diminuisce sempre perché < durevolezza
 
 
 #### problemi maggiori
@@ -1319,6 +1334,7 @@ Senza le SS, un mancato acquisto, diminuirebbe la domanda media, e quindi lo sto
 	- capire se utilità e stock ratio possono essere negativi
 	- scegliere giusta equazione di acquisto
 	- capire ordine di grandezza giusto di trigger e stock threshold
+- utilità in questo momento può diventare <0. Tuttavia  non dovrebbe essere così
 
 _________________________________________________
 
@@ -1334,6 +1350,8 @@ _________________________________________________
 - abbiamo messo production cost come baseline di prezzo --> ora prezzo, qualità e sostenibilità sono interdipendenti
 - abbiamo cambiato il prod
 - cambiare i pesi della serie storica
+- la somma di alpha beta e  gamma è ora = 1--> i pesi da usare sono stati nominati alpha-norm... etc
+- abbiamo messo il vincolo sull'utility t.c.limite inferiore  =0
 
 
 

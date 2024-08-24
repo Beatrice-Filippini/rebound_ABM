@@ -62,13 +62,21 @@ companies-own [
   ;production-capability
   c-ID
   c-demand             ;List: it is used in the setup procedure to calculate the company's average demand for each class of products, starting from the sales history
-  earnings
+  earnings             ;sum of earnings of all the products sold in the current tick.
+  c-production-cost    ;sum of p-production-cost of all the products sold in the current tick.
+  c-revenues           ;earning - c-production cost: it is calculated for each tick
+  c-revenues-list      ;it is a list of maximum length = length-revenues-list (it is updated in each period)
+  period-revenues-per-unit         ;it is the average revenue per unit for each tick
+  period-revenues-per-unit-list    ;it is a list of maximum length = length-revenues-list (it is updated in each period) that saves period-revenues-per-unit in each tick
+  target-revenues-per-unit         ;it is the period-revenues-per-unit to  which the company aims: if not reached it activates the company's sustainability strategy. It is updated every (length-revenues-list) ticks.
 
   ;companies memory
   c-memory             ;List of lists - is the sales history of the company and tracks the sales grouped by class of products for 10 periods: the first element (the first sublist) is the most recent one.
                        ;It is used to take decisions regarding how much to produce and to keep as stock.
   c-new-memory         ;List - it is a support variable used to calculate for each class, the sum of bought products. It represents the c-memory of the current tick.
                        ;It will be used to update the actual memory (c-memory) by becoming the first sublist. Therefore the last element will be removed in order to keep the main memory of length 10.
+  c-sust-increase      ;increase in c-sustainability due to the company's sustainability strategy
+
 
 ]
 
@@ -79,7 +87,6 @@ globals [
   users-list
   best-products-list    ;global list which saves the who of the best product chosen by each user
   best-companies-list   ;global list which saves the c-ID of the company which produces the best product
-  ;p-net-revenues-list   ;is a list containing elements that represents the total sum for each company of (earnings - production costs) for each product sold
   n-class-of-products
   c-len-memory          ;length of the list c-memory: it indicates the number of sublists present in c-memory. Each sublist represents a tick
   wasted-prod           ;products that go to waste in the current tick because they are not sold
@@ -111,6 +118,7 @@ globals [
   delta
   omega
   exponent
+  length-revenues-list
 
 ]
 
@@ -157,6 +165,7 @@ to init-globals
   set delta 0.1
   set omega 0.1
   set exponent 0.5
+  set length-revenues-list 180                                  ;review: it depends on te context (food vs fashion)
   ;c-security-stock will be set afterwards
 end
 
@@ -242,13 +251,9 @@ to creation-users
     set gamma gamma
     let sum-weights 0
     set sum-weights alpha + beta + 1
-;    set alpha-norm alpha / sum-weights
-;    set beta-norm beta / sum-weights
-;    set gamma-norm 1 - (alpha-norm + beta-norm)
-    set alpha-norm random-float 1
-    set beta-norm random-float 1
-  set gamma-norm random-float 1
-
+    set alpha-norm alpha / sum-weights
+    set beta-norm beta / sum-weights
+    set gamma-norm 1 - (alpha-norm + beta-norm)
 
     ; each user has a stock of (n-class-of-products) items and sets the initial stock of each class (each element of the list) as a random number between 0 and 5
     set stock n-values n-class-of-products [random 5]
@@ -274,10 +279,18 @@ to creation-companies
     set color black
     set size 3
     set shape "factory"
-    set earnings 0
+
     set c-ID id
-    ;list of (n-class-of-products)-elements in which the initial demand will be calculated using the number of users and the cons-per-user
-    set c-demand []
+    set c-demand []                                                  ;list of (n-class-of-products)-elements in which the initial demand will be calculated using the number of users and the cons-per-user
+
+    set c-sust-increase 1.1                                                         ;Increase in c-sustainability due to the strategy: now it is equal for all companies but it could become heterogeneous
+    set earnings 0
+    set c-production-cost 0
+    set c-revenues 0
+    set c-revenues-list []
+    ;set target-revenues-per-unit ????? ;;;FIX: random (20)--> il 20 dipende molto da livello medio dei prezzi (varia da food al fashion
+    set period-revenues-per-unit 0
+    set period-revenues-per-unit-list []
 
     ;Here the c-demand is setup
     ; HP: For each class of products we have a consumption rate (f.e. 20%), consequently we hypothesize that the (cons-per-user)% of users (f.e. 20%) will buy that specific class of product today
@@ -363,7 +376,9 @@ to creation-companies
 
         ;Given the possible price range for each class, the attribute of new product generated, will assume a value equal to the (production cost baseline) + (a random point taken trom the attribute-varibility range)
         let price-variability ( item i p-price-max-list - p-production-cost ) * [ c-price ] of my-company
-        set p-price item i p-price-min-list + ( random price-variability )
+        set p-price p-production-cost + ( random-float price-variability )
+        ;;price var= (2.6 - 1.46)* 0.73
+
         ;print (word "p-category: " item i p-name-list word " baseline:" item i p-price-min-list  word " price-variability: " price-variability word " p-price: " p-price)
 
         set p-shelf-life item i p-shelf-life-list
@@ -410,6 +425,7 @@ to go
   user-stock-consumption
   get-normalized-status
   utility-function-management
+  update-revenues-list
 
   ; 3. the product
   residual-life-consumption
@@ -420,7 +436,7 @@ to go
   sales-history-update
   demand-assessment
   new-products-creation
-  strategy-changing ;check
+  company-sustainability-strategy
 
   tick
 end
@@ -525,7 +541,7 @@ to utility-function-management
 
       ; first, compute the utility assuming that the quantity of stock of the class of products is not relevant (without considering the effective need)
 
-      set p-utility (   max list ( (p-quality-norm * my-alpha-norm) + (p-sustainability-norm * my-beta-norm) - (p-price-norm * my-gamma-norm)) 0  * p-RL/SL-ratio-norm  )  ^ exponent
+      set p-utility (   max list ( (p-quality-norm * my-alpha-norm) + (p-sustainability-norm * my-beta-norm) - (p-price-norm * my-gamma-norm)) 0  * p-RL/SL-ratio-norm  ) ^ exponent
 
 
       ; second, i evaluate how much stock i have for each class of products
@@ -596,6 +612,7 @@ to utility-function-management
 
       set chosen-product one-of chosen-product
       let chosen-company companies with [c-ID = [owner-ID] of chosen-product ]
+        print (word "---who---" [who] of chosen-product "--primary---" [primary-prod] of chosen-product"---price----"[p-price] of chosen-product "---cost---" [p-production-cost] of chosen-product "---company---" [who] of chosen-company)
 
         ;ora abbiamo c-memory che ha lo storico e c-new-memory = []
 
@@ -603,8 +620,10 @@ to utility-function-management
       ;print (word "tick " ticks " stock-i post acquisto: " stock)
 
       ask chosen-company [
-        ; add the earnings
-        set earnings earnings + [ p-price ] of chosen-product ;FB poi ci saranno da mettere anche i costi di produzione
+          ;As people buy, the following variables are updated depending on the sold products
+          set earnings earnings + [ p-price ] of chosen-product
+          set c-production-cost c-production-cost + [p-production-cost] of chosen-product
+          set c-revenues earnings - c-production-cost
 
         ; add the memory in the correct position
         let c-new-memory-to-add item index-product c-new-memory ; prendo l'elemento da aumentare di uno dalla memoria temporanea
@@ -619,6 +638,28 @@ to utility-function-management
     ]
       ;print (word "tick: " ticks " who" [who] of self " i "index-product " stock-ratio: "precision (i-stock / i-stock-threshold) 2 " i-stock: " precision i-stock  2 " i-stock-threshold: " precision i-stock-threshold 2 "  result ut*trig " precision (utility-of-best-product * trigger) 2 "  utility-of-best-product " (precision utility-of-best-product 2) "  trigger: "trigger " buy-bool "buy-bool )
     ]
+  ]
+
+end
+
+to update-revenues-list
+  ask companies [
+    ;The following lists are updated based on the output results of the procedure utility-function-management
+    set c-revenues-list lput c-revenues c-revenues-list
+    print (word "who  " [who] of self "  rev list  "c-revenues-list "  memory  "c-new-memory)
+    set period-revenues-per-unit safe-divide (last c-revenues-list)  (sum c-new-memory)
+
+    ;At the end of the period (day/month), companies calculate the average revenue for each product sold in the corresponding period
+    ;It is calculated as: the revenues made in the current tick (daily/monthly revenues) / the total units of products sold in the current tick (sum c-new memory)
+
+    ;Then, this result is inserted in a list that keeps memory of these results for a number of periods  = length-revenues-list
+    set period-revenues-per-unit-list lput period-revenues-per-unit period-revenues-per-unit-list
+
+    ;Reset the following variable for the next tick
+    set earnings 0
+    set c-production-cost 0
+    set c-revenues 0
+    set period-revenues-per-unit 0
   ]
 
 
@@ -647,7 +688,7 @@ end
 to strategy-discount
   ask products with [ p-residual-life <= (threshold-1 * p-shelf-life)]
   [
-    set p-price p-discount * p-price
+    set p-price max list (p-discount * p-price) (p-production-cost)
   ]
 end
 
@@ -835,13 +876,16 @@ to new-products-creation
         fd 3
 
         set p-name item j p-name-list
-        let price-variability ( item j p-price-max-list - item j p-price-min-list ) * [ c-price ] of my-company
-        set p-price item j p-price-min-list + ( random price-variability )
-
         let sustainability-variability ( item j p-sustainability-max-list - item j p-sustainability-min-list )
         set p-sustainability item j p-sustainability-min-list + (random sustainability-variability * [ c-sustainability ] of my-company )
 
         set p-production-cost item j p-price-min-list * (1 + delta * p-sustainability + omega * p-quality)
+        let price-variability ( item j p-price-max-list - p-production-cost ) * [ c-price ] of my-company
+        set p-price p-production-cost + ( random-float price-variability )
+
+
+
+
 
         ;p-shelf-life is assumed as the same for all products of the same class
         ;p-residual-life represents the remaining life of the product at the time it arrives at the shop. It is therefore heterogeneous as it takes into account all those real factors that may cause
@@ -870,10 +914,32 @@ to check
 end
 
 ;;;;LONG TERM STRATEGIES
-to strategy-changing
+to company-sustainability-strategy
 ;solo strategia di sostenibilità:
+  ;se per x periodi ho le revenues < rispetto a quanto mi aspetto,  allora incremento c-sustainability
+
+  ask companies [
+    if (length c-revenues-list = length-revenues-list)
+    ;allora valutiamo se  applicare la strategia di sostenibilità
+    [
+      if ( mean period-revenues-per-unit-list < target-revenues-per-unit)
+      [
+        set c-sustainability c-sustainability * c-sust-increase
+      ]
+
+      set c-revenues-list []
+      set period-revenues-per-unit-list []
+    ]
+    ;;;qui abbiamo appena finito di implementare la strategia di sostenibilità
+
+
+
+
+  ]
+
   ; esempio food: collaborazioni esselunga - altromercato (linea prodotti sostenibili) / per sostenibilità sociale--> queste azioni aumentano la sostenibilità percepita delle compagnie
   ; esempio fashion: zara dichiara di produrre i suoi capi con x% in meno di acqua/risore--> queste azioni aumentano la sostenibilità percepita delle compagnie
+
 
 end
 
@@ -962,7 +1028,7 @@ n-companies
 n-companies
 1
 20
-12.0
+2.0
 1
 1
 agents
@@ -977,7 +1043,7 @@ n-users
 n-users
 10
 50
-50.0
+15.0
 5
 1
 agents
@@ -1293,6 +1359,21 @@ count (users with [buy-bool = true])
 1
 11
 
+SLIDER
+20
+285
+192
+318
+target-baseline
+target-baseline
+0
+100
+50.0
+1
+1
+NIL
+HORIZONTAL
+
 @#$#@#$#@
 ## NOTA BENE
 - nota: netlogo è case sensitive, quindi può essere necessario implementare un check sul nome dei prodotti inseriti nella matrice
@@ -1317,13 +1398,37 @@ Senza le SS, un mancato acquisto, diminuirebbe la domanda media, e quindi lo sto
 ## Problemi da risolvere
 
 #### problemi  minori
+- inserire  COMPANY-SUSTAINABILITY-STRATEGY di companies per sostenibilità
+	- calcolare production costs allo stesso modo di  earning
+- settare target revenues per ogni compagnia (più tardi  potremo considerare 		di considerare la posizione dell'azienda rispetto alle altre)
+	- target revenues sono proporzionali a quanto un'azienda vende
+	- consideriamo il prezzo medio (o revenues medie) di tutti i prodotti venduti
+	- caso migliore: revenues medie si avvicinano molto a prezzo max dei prodotti
+	- worst case: ho venduto solo i prodotti con revenues più basse
+	- target revenues:
+	- capire come gestire companies con revenues ai limiti inf o sup 
+
+RIPARTIAMO DA: rivedere tutto e commentare e poi settare target 
+
+- revenues negative dipendono/dipendevano da:
+	- prezzo scontato < production cost--> risolto con max list MA può essere 		risolto ulteriormente imponendo un prezzo iniziale t.c. revenues % > di un tot
+	- prezzi uguali a 0--> vedi debug
+	- se svr --> prezzo di riprocessato= prezzo  di prodotto  di primario + costo 		di riprocessamento
+	--> le fasce  di  prezzo delle diverse classi, non possono sovrapporsi
+
+	- lower value reprocess--> bisognerebbe introdurre costo di smaltimento
+
+
 - capire se usare net revenue o earnings-> settare production cost come detto durante incontro
-- inserire  STRATEGY CHANGING di companies per sostenibilità
+
 - impostare grafico con sostenibilità e numero di prodotti venduti
 - capire perché normalizzando i valori si compra di meno (x giustificare nella tesi)
-- come cambia quality una volta che riprocessiamo?
-	- HP: nel food-> diminuisce sempre perche aggiungo additivi
-	- HP: nel fashion-> diminuisce semp
+- impostare vincoli t.c.  se qualcosa  nella simulazione non ha senso, allora venga  stoppata 
+	- (f.e.; in utility: vedi if count  products !=0
+	- f.e in update-revenues-list, se il p-revenues-per unit rimane zero ma sum 		c-new-memory è =! 0, allora stoppa tutto
+
+
+
 
 
 #### problemi maggiori
@@ -1335,6 +1440,9 @@ Senza le SS, un mancato acquisto, diminuirebbe la domanda media, e quindi lo sto
 	- scegliere giusta equazione di acquisto
 	- capire ordine di grandezza giusto di trigger e stock threshold
 - utilità in questo momento può diventare <0. Tuttavia  non dovrebbe essere così
+- come cambia quality una volta che riprocessiamo?
+	- HP: nel food-> diminuisce sempre perche aggiungo additivi
+	- HP: nel fashion-> diminuisce sempre perché < durevolezza
 
 _________________________________________________
 
@@ -1352,6 +1460,9 @@ _________________________________________________
 - cambiare i pesi della serie storica
 - la somma di alpha beta e  gamma è ora = 1--> i pesi da usare sono stati nominati alpha-norm... etc
 - abbiamo messo il vincolo sull'utility t.c.limite inferiore  =0
+	- calcolare le revenues ( earnings - production costs) -> sarà una lista con 		un elemento per ogni  tick
+	- la lista salva solo gli ultimi x periodi (x è un parametro) 
+	- se la media delle revenues di questa lista dummy è < target -> strategia
 
 
 
@@ -1382,6 +1493,8 @@ _________________________________________________
 - le aziende hanno capacità produttiva infinita
 - le scorte di sicurezza sono omogenee tra tutte le compagnie
 - la domanda prevista dalle compagnie si assume in linea con gli acquisti medi degi ultimi 10 periodi
+- le compagnie calcolano le loro revenues a fine giornata/mese. Successivamente questi risultati vengono  aggiunti  in una lista che può essere considerata un "bilancio"
+- ogni tot periodi, le compagnie consultano il bilancio e valutano se è necessario implementare una strategia di sostenibilità per incrementare la c-sustainability nel lungo termine e di conseguenza, a cascata anche la p-sustainability (e infine anche le vendite - si spera)
 
 
 

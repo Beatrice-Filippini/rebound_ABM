@@ -242,13 +242,9 @@ to creation-users
     set gamma gamma
     let sum-weights 0
     set sum-weights alpha + beta + 1
-;    set alpha-norm alpha / sum-weights
-;    set beta-norm beta / sum-weights
-;    set gamma-norm 1 - (alpha-norm + beta-norm)
-    set alpha-norm random-float 1
-    set beta-norm random-float 1
-  set gamma-norm random-float 1
-
+    set alpha-norm alpha / sum-weights
+    set beta-norm beta / sum-weights
+    set gamma-norm 1 - (alpha-norm + beta-norm)
 
     ; each user has a stock of (n-class-of-products) items and sets the initial stock of each class (each element of the list) as a random number between 0 and 5
     set stock n-values n-class-of-products [random 5]
@@ -525,7 +521,7 @@ to utility-function-management
 
       ; first, compute the utility assuming that the quantity of stock of the class of products is not relevant (without considering the effective need)
 
-      set p-utility (   max list ( (p-quality-norm * my-alpha-norm) + (p-sustainability-norm * my-beta-norm) - (p-price-norm * my-gamma-norm)) 0  * p-RL/SL-ratio-norm  )  ^ exponent
+      set p-utility (   max list ( (p-quality-norm * my-alpha-norm) + (p-sustainability-norm * my-beta-norm) - (p-price-norm * my-gamma-norm)) 0  * p-RL/SL-ratio-norm  ) ^ exponent
 
 
       ; second, i evaluate how much stock i have for each class of products
@@ -962,7 +958,7 @@ n-companies
 n-companies
 1
 20
-12.0
+2.0
 1
 1
 agents
@@ -977,7 +973,7 @@ n-users
 n-users
 10
 50
-50.0
+15.0
 5
 1
 agents

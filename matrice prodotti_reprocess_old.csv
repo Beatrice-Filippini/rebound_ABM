@@ -1,0 +1,9 @@
+name,Waste,Fresh fruits and vegetables,Frozen Food,Sweets,Canned  Food,Meat,Fish,Pasta
+Waste,0,0_na,0_na,0_na,0_na,0_na,0_na,0_na
+Fresh fruits and vegetables,0.80,2_hvr,0_na,0_na,0_na,0_na,0_na,0_na
+Frozen Food,0.7,0_na,0.3_svr,0_na,0_na,0_na,0_na,0_na
+Sweets,1,0_na,0_na,0_na,0_na,0_na,0_na,0_na
+Canned Food,1,0_na,0_na,0_na,0_na,0_na,0_na,0_na
+Meat,0.7,0_na,0.3_svr,0_na,0_na,0_na,0_na,0_na
+Fish,0.7,0_na,0.3_svr,0_na,0_na,0_na,0_na,0_na
+Pasta,0.5,0_na,0_na,0_na,0_na,0_na,0_na,0.5_lvr

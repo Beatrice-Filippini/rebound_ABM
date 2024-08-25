@@ -17,6 +17,7 @@ products-own [
   p-RL/SL-ratio
   p-production-cost
   owner-ID
+  p-amount
   primary-prod
   p-stock-threshold
 
@@ -77,7 +78,6 @@ companies-own [
   c-sust-increase      ;increase in c-sustainability due to the company's sustainability strategy
 
 
-  tot-demand
 ]
 
 globals [
@@ -119,8 +119,6 @@ globals [
   omega
   exponent
   length-revenues-list
-  died-products
-  bought-products
 
 ]
 
@@ -153,6 +151,7 @@ to init-globals
   set users-list []
   set best-products-list []
   set best-companies-list []
+  ;set p-net-revenues-list []
   set utilities-list []
   set p-whos-list []
 
@@ -167,8 +166,6 @@ to init-globals
   set omega 0.1
   set exponent 0.5
   set length-revenues-list 180                                  ;review: it depends on te context (food vs fashion)
-  set died-products 0
-  set bought-products 0
   ;c-security-stock will be set afterwards
 end
 
@@ -176,7 +173,7 @@ end
 ;The rows of the matrix are 'waste' and then all product classes, with the same wording as the column headings.
 to read-file-matrix
     file-close-all
-    file-open "Reprocessing_matrix.csv"
+    file-open "matrice prodotti_reprocess_old.csv"
     set m1 []
     let i 0
     while [ not file-at-end? ] [
@@ -433,7 +430,7 @@ to go
   ; 3. the product
   residual-life-consumption
   strategy-discount
-  strategy-reprocess
+  strategy-reprocess-old
 
   ; 4. the company
   sales-history-update
@@ -445,7 +442,6 @@ to go
 end
 
 to refresh-variables
-  set bought-products 0
 
   ask users [
     set buy-bool false
@@ -584,6 +580,13 @@ to utility-function-management
     set best-companies-list lput best-company best-companies-list
 
 
+    ;print (word "my BP: " my-best-product word "users-list: " users-list word " best-products-list: " best-products-list word " best-companies-list: " best-companies-list word " best-company: " best-company)
+;    ask products
+;    [
+;      set p-net-revenues-list lput ( ( [p-price] of one-of products with [who = last best-products-list]) - ([p-production-cost] of one-of products with [who = last best-products-list])) p-net-revenues-list
+;    ]
+
+
     if debug and who < 5 [
       print ( word "who: " who " - s: " precision stock 2 "  - st:" precision p-stock-threshold 2 " - u:" precision utility-of-best-product 2 " t:" precision trigger 2 " |||||| left:" precision ( stock / p-stock-threshold ) 2 " <= right:" precision ( utility-of-best-product * trigger ) 2)
       if max-utility = 0 [ print utilities-list ]
@@ -602,7 +605,6 @@ to utility-function-management
         ; la mia propensione all'acquisto (ovvero il trigger)è compresa tra 0 e 2
         ; allo stesso tempo, la mancanza di prodotti nel mio stock guida la scelta del mio prodotto migliore (nel senso che, se ho bisogno di frozen food, l'utilità di quello specifico prodotto verrà incrementata)
         ; SULLA CARTA QUESTO RAGIONAMENTO DOVREBBE AVERE SENSO
-        set bought-products bought-products + 1
 
       set buy-bool True ; the user buys an item
       set color pink
@@ -610,7 +612,7 @@ to utility-function-management
 
       set chosen-product one-of chosen-product
       let chosen-company companies with [c-ID = [owner-ID] of chosen-product ]
-        ;print (word "---who---" [who] of chosen-product "--primary---" [primary-prod] of chosen-product"---price----"[p-price] of chosen-product "---cost---" [p-production-cost] of chosen-product "---company---" [who] of chosen-company)
+        print (word "---who---" [who] of chosen-product "--primary---" [primary-prod] of chosen-product"---price----"[p-price] of chosen-product "---cost---" [p-production-cost] of chosen-product "---company---" [who] of chosen-company)
 
         ;ora abbiamo c-memory che ha lo storico e c-new-memory = []
 
@@ -644,15 +646,7 @@ to update-revenues-list
   ask companies [
     ;The following lists are updated based on the output results of the procedure utility-function-management
     set c-revenues-list lput c-revenues c-revenues-list
-
-    foreach c-revenues-list [
-    element ->
-    if element < 0 [
-      print (word "who  " [who] of self "  rev list  "  c-revenues-list  "  memory  "c-new-memory) ; Stampa l'intera lista se c'è un elemento negativo
-      stop  ; Termina l'operazione appena viene trovato un elemento negativo
-    ]
-  ]
-
+    print (word "who  " [who] of self "  rev list  "c-revenues-list "  memory  "c-new-memory)
     set period-revenues-per-unit safe-divide (last c-revenues-list)  (sum c-new-memory)
 
     ;At the end of the period (day/month), companies calculate the average revenue for each product sold in the corresponding period
@@ -682,9 +676,7 @@ to residual-life-consumption
   [
     set p-residual-life (p-residual-life - 1)
     ;print (word "prod name: " p-name " prod RL: " p-residual-life " prod SL: " p-shelf-life)
-    if p-residual-life = 0 [
-     set died-products died-products + 1
-      die ]
+    if p-residual-life = 0 [ die ]
   ]
 end
 
@@ -700,6 +692,117 @@ to strategy-discount
   ]
 end
 
+to strategy-reprocess-old
+  let num-rows length  m1
+  let num-columns length first m1
+ ;print (word "numero righe: " num-rows word " numero colonne: " num-columns)
+
+  let i 2 ;righe
+  let j 0 ;colonne
+          ;NB: per chiamare l'elemento i,j devo scrivere "item j item i m1"
+
+  while [ i < num-rows ]
+  [
+    let p-name-in-matrix item j item i m1
+
+    ask products with [p-name = p-name-in-matrix and p-residual-life <= (threshold-2 * p-shelf-life) and primary-prod = 1 ]
+      [
+
+          set j j + 1
+          let p-waste item j item i m1
+        print(word"p-waste" p-waste)
+
+          let n-products-to-transform count products
+
+          if (p-waste > 0)
+          [
+          let n-products-to-waste ceiling (n-products-to-transform * p-waste)
+
+          set wasted-prod n-products-to-waste
+          set wasted-prod-cum wasted-prod-cum + wasted-prod
+
+          ask n-of n-products-to-waste products [die]
+          ;print (word p-name-to-be-transformed word "total-products: "total-products word "  n-products-to-transform: " n-products-to-transform word "  n-products-to-waste: " n-products-to-waste word "  prodotti rimasti: " count products)
+
+          ];fine if p-waste
+
+        while [j >= 1 and j < (num-columns - 1) ]
+        [
+          set j j + 1 ;j=2
+          let cell-text item j item i m1
+          let numeric-part read-from-string (first (word cell-text "_"))
+          let text-part last (word cell-text "_")
+
+          if (numeric-part > 0)
+          [
+            let n-products-to-reprocess floor (n-products-to-transform * numeric-part)
+            print n-products-to-reprocess
+
+            if (text-part = "hvr")
+               [
+                  hatch n-products-to-reprocess
+                  [
+                    ;Reprocess example: fruit and vegetables
+                    set p-name (item j item 0 m1)
+                    set primary-prod 0
+
+
+                    set p-residual-life (item j p-shelf-life-list )
+                    set p-shelf-life (item j p-shelf-life-list)
+
+                    set p-price (1.1 * p-price)                     ;fix
+                    set p-sustainability 1.1 * p-sustainability     ;fix
+                    set p-quality (0.9 * p-quality)
+                  ]
+                  ;print (word "p-amount: " p-amount " p-amount-hvr: " p-amount-hvr " p-hvr: " p-hvr)
+                  ;set p-amount p-amount - p-amount-hvr
+               ]
+
+            if (text-part = "svr") ;;review: probabilmente c'è da aggiungere la  condizione che svr avviene solo se cat di partenza = classe di dest OPPURE le fasce di prezzo dei 2 range devono sovrapporsi
+               [
+                  hatch n-products-to-reprocess
+                  [
+                    ;esempio pollo-> pollo congelato
+                    set p-name (item j item 0 m1)
+                    set primary-prod 0
+                    set p-residual-life (item j p-shelf-life-list )
+                    set p-shelf-life (item j p-shelf-life-list)
+
+                    set p-sustainability (1.1 * p-sustainability)   ; fix
+                    set p-quality (0.9 * p-quality)
+                  ]
+               ]
+
+            if (text-part = "lvr")
+               [
+                  hatch n-products-to-reprocess
+                  [
+                    ;esempio pasta -> pasta con semola rimacinata
+                    set p-name (item j item 0 m1)
+                    set primary-prod 0
+                    set p-residual-life (item j p-shelf-life-list )
+                    set p-shelf-life (item j p-shelf-life-list)
+
+                    set p-price 0.9 * p-price                       ;fix
+                    set p-sustainability (1.1 * p-sustainability)   ;fix
+                    set p-quality (0.9 * p-quality)
+                  ]
+                  ;set p-amount p-amount - p-amount-lvr
+               ]
+          ]; end of if (numeric-part>0)
+      ]; end of second while
+
+    set j 0
+
+    ]; end of ask product
+    set i i + 1
+
+  ]
+
+
+end
+
+
 
 ;Hypothesis 1: the entire unit of the product is either reprocessed or goes to waste.
 ;Hypothesis 2: once excedeed the threshold-2, products will be either reprocessed (according to the % expressed in the matrix) or will go to waste
@@ -707,10 +810,9 @@ end
 ;The matrix is structured as follows: rows of the matrix contain the label 'waste' and then the name of all product classes; the same labels are used as the column headings.
 ;The remaining cells contain a number representing the percentage of products in that class that are reprocessed.
 ;Reprocessing has as its starting class the one indicated in the row, and as its destination the class indicated in the corresponding column.
-to strategy-reprocess
+to strategy-reprocess-new
   let num-rows length  m1
   let num-columns length first m1
-
   ;print (word "numero righe: " num-rows word " numero colonne: " num-columns)
 
   let i 2 ;rows
@@ -720,21 +822,17 @@ to strategy-reprocess
   while [ i < num-rows ]
   [
     let p-name-to-be-transformed item j item i m1
-    let eligible-products products with [p-name = p-name-to-be-transformed and p-residual-life <= (threshold-2 * p-shelf-life) and primary-prod = 1]
     ;print (word "numero agenti totali: " count products)
 
     ;here only the products that satisfy the RL criteria, will be reprocessed
-
-    if any? eligible-products
+    ask products with [p-name = p-name-to-be-transformed and p-residual-life <= (threshold-2 * p-shelf-life) and primary-prod = 1]
       [
         ;print (word "numero agenti da riprocessare: " count products word " RL:  " mean [p-residual-life] of products word " t2* SL: " threshold-2 * (mean [p-shelf-life] of products) )
+        set j j + 1 ;j=1
 
-        set j j + 1
-        let n-products-to-transform count eligible-products
         ;first, the waste generated is managed
         let p-waste item j item i m1
-        ;print(word "tick--" ticks"--class--" p-name-to-be-transformed"--p-waste--" p-waste "--i--"i "--j--"j )
-
+        let n-products-to-transform (count products)
         ;print ( word "n-class-of-products-to-transform" n-class-of-products-to-transform )
 
         if (p-waste > 0)
@@ -744,7 +842,7 @@ to strategy-reprocess
           set wasted-prod n-products-to-waste
           set wasted-prod-cum wasted-prod-cum + wasted-prod
 
-          ask n-of n-products-to-waste eligible-products [die]
+          ask n-of n-products-to-waste products [die]
           ;print (word p-name-to-be-transformed word "total-products: "total-products word "  n-products-to-transform: " n-products-to-transform word "  n-products-to-waste: " n-products-to-waste word "  prodotti rimasti: " count products)
         ]
 
@@ -759,10 +857,7 @@ to strategy-reprocess
           [
             let n-products-to-reprocess floor (n-products-to-transform * percentual-reprocessing)       ;this quantity is the complementary of "n-products-to-waste"
 
-
-            ask n-of n-products-to-reprocess eligible-products
-            [
-            hatch 1
+            hatch n-products-to-reprocess
             [
               ;Setup the attributes of the reprocessed product (k)
               set p-name (item j item 0 m1)
@@ -790,15 +885,14 @@ to strategy-reprocess
 
               set p-shelf-life item k p-shelf-life-list
             ]
-            die
+            let n-products-to-die n-products-to-reprocess
             ;print (word "n-products-to-die: " n-products-to-die " n-products-to-reprocess: " n-products-to-reprocess " n-products-to-reprocess: " n-products-to-reprocess " n-products  " count products with [p-name = p-name-to-be-transformed and p-residual-life <= (threshold-2 * p-shelf-life)])
-            ]
+            ask n-of n-products-to-die products [die]
 
           ]
         ]
-
+        set j 0
     ]
-    set j 0
     set i i + 1
 
   ]
@@ -840,8 +934,6 @@ to demand-assessment
       set c-demand replace-item i c-demand n-product-sold-class-i
       set i i + 1
     ]
-    set tot-demand [sum c-demand] of self
-
 
 
 
@@ -1062,17 +1154,17 @@ n-users
 n-users
 10
 50
-25.0
+20.0
 5
 1
 agents
 HORIZONTAL
 
 MONITOR
-830
-558
-1003
-619
+997
+18
+1170
+79
 Mean price
 precision mean ( [p-price] of products ) 2
 17
@@ -1080,10 +1172,10 @@ precision mean ( [p-price] of products ) 2
 15
 
 MONITOR
-831
-622
-1002
-683
+998
+82
+1169
+143
 Mean sustainability
 precision mean [ p-sustainability ] of products  2
 17
@@ -1091,10 +1183,10 @@ precision mean [ p-sustainability ] of products  2
 15
 
 MONITOR
-831
-693
-1003
-754
+998
+153
+1170
+214
 Avg Stock of Products
 precision mean [ mean stock ] of users 2
 17
@@ -1119,10 +1211,10 @@ NIL
 1
 
 PLOT
-877
-23
-1190
-177
+663
+181
+976
+335
 User stock of products
 NIL
 NIL
@@ -1158,8 +1250,8 @@ SALVA!!!!!!!!
 1
 
 PLOT
-626
-209
+662
+339
 979
 523
 Company stock of producs
@@ -1173,9 +1265,7 @@ true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot count products with [owner-id = 1]"
-"pen-1" 1.0 0 -12087248 true "" "plot count products with [owner-id = 2]"
-"pen-2" 1.0 0 -2674135 true "" "plot count products with [owner-id = 3]"
+"default" 1.0 0 -16777216 true "" "plot count products"
 
 MONITOR
 379
@@ -1189,9 +1279,9 @@ count products
 15
 
 PLOT
-981
-219
-1467
+989
+347
+1232
 522
 N-products reprocessed vs normal
 NIL
@@ -1224,10 +1314,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-831
-759
-1003
-828
+998
+219
+1170
+288
 wasted-prod 
 wasted-prod
 17
@@ -1235,10 +1325,10 @@ wasted-prod
 17
 
 PLOT
-997
-10
-1211
-184
+1238
+346
+1452
+520
 wasted-products
 NIL
 NIL
@@ -1251,13 +1341,12 @@ false
 "" ""
 PENS
 "default" 1.0 0 -955883 true "" "plot wasted-prod "
-"pen-1" 1.0 0 -7500403 true "" "plot died-products"
 
 MONITOR
-1019
-697
-1201
-758
+1186
+157
+1368
+218
 MIN stock of products
 precision min [ min stock ] of users 2
 17
@@ -1265,10 +1354,10 @@ precision min [ min stock ] of users 2
 15
 
 MONITOR
-1020
-762
-1201
-823
+1187
+222
+1368
+283
 MAX stock of products
 precision max [ max stock ] of users 2
 17
@@ -1370,6 +1459,17 @@ count products with [p-name = item 6 p-name-list]
 1
 11
 
+MONITOR
+1206
+21
+1270
+66
+n-buyers
+count (users with [buy-bool = true])
+17
+1
+11
+
 SLIDER
 20
 285
@@ -1379,31 +1479,11 @@ target-baseline
 target-baseline
 0
 100
-51.0
+50.0
 1
 1
 NIL
 HORIZONTAL
-
-PLOT
-1247
-31
-1447
-181
-plot 1
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -16777216 true "" "plot [tot-demand ]of company with [c-ID = 1]"
-"pen-1" 1.0 0 -10899396 true "" "plot [sum c-demand] of company with [c-id = 2]"
-"pen-2" 1.0 0 -2674135 true "" "plot [sum c-demand] of company with [c-id = 3]"
 
 @#$#@#$#@
 ## NOTA BENE

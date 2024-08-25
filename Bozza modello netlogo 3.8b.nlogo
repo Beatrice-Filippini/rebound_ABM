@@ -118,9 +118,11 @@ globals [
   delta
   omega
   exponent
+  exponent-price
   length-revenues-list
   died-products
   bought-products
+  minimum-revenue-%
 
 ]
 
@@ -166,9 +168,11 @@ to init-globals
   set delta 0.1
   set omega 0.1
   set exponent 0.5
+  set exponent-price 0.1                                        ;review: it depends on te context (food vs fashion)--> in fashion i prezzi tra diverse companies sono più eterogenei
   set length-revenues-list 180                                  ;review: it depends on te context (food vs fashion)
   set died-products 0
   set bought-products 0
+  set minimum-revenue-% 0.20
   ;c-security-stock will be set afterwards
 end
 
@@ -305,7 +309,7 @@ to creation-companies
     ]
 
     ;Assign behavioural parameters to each company
-    set c-price random-float 1                                                        ;Between 0 and 1: it will multiply the price-variability range in order to obtain an intermediate value
+    set c-price 0.5 + random-float 0.5                                                        ;Between 0.5 and 1: it will multiply the price-variability range in order to obtain an intermediate value
                                                                                       ;The lower c-price will be, the cheaper the company will be and viceversa
     set c-sustainability  random-float 1
     set c-quality  random-float 1
@@ -379,7 +383,10 @@ to creation-companies
 
         ;Given the possible price range for each class, the attribute of new product generated, will assume a value equal to the (production cost baseline) + (a random point taken trom the attribute-varibility range)
         let price-variability ( item i p-price-max-list - p-production-cost ) * [ c-price ] of my-company
-        set p-price p-production-cost + ( random-float price-variability )
+        let minimum-revenue p-production-cost * minimum-revenue-%  ;minimum-revenue espressa in euro
+        let minimum-price p-production-cost + minimum-revenue
+        set p-price minimum-price + ( random-float (price-variability -  minimum-revenue ))
+
         ;;price var= (2.6 - 1.46)* 0.73
 
         ;print (word "p-category: " item i p-name-list word " baseline:" item i p-price-min-list  word " price-variability: " price-variability word " p-price: " p-price)
@@ -622,6 +629,10 @@ to utility-function-management
           set earnings earnings + [ p-price ] of chosen-product
           set c-production-cost c-production-cost + [p-production-cost] of chosen-product
           set c-revenues earnings - c-production-cost
+          if (c-revenues <= 0)
+          [
+            print (word "  earnings  " earnings "  c-production-cost  " c-production-cost "  primario?  " [primary-prod ]of chosen-product "  revenues  "  c-revenues " c-price "c-price)
+          ]
 
         ; add the memory in the correct position
         let c-new-memory-to-add item index-product c-new-memory ; prendo l'elemento da aumentare di uno dalla memoria temporanea
@@ -645,13 +656,13 @@ to update-revenues-list
     ;The following lists are updated based on the output results of the procedure utility-function-management
     set c-revenues-list lput c-revenues c-revenues-list
 
-    foreach c-revenues-list [
-    element ->
-    if element < 0 [
-      print (word "who  " [who] of self "  rev list  "  c-revenues-list  "  memory  "c-new-memory) ; Stampa l'intera lista se c'è un elemento negativo
-      stop  ; Termina l'operazione appena viene trovato un elemento negativo
-    ]
-  ]
+;    foreach c-revenues-list [
+;    element ->
+;    if element <= 0 [
+;      print (word "who  " [who] of self "  rev list  "  c-revenues-list  "  memory  "c-new-memory) ; Stampa l'intera lista se c'è un elemento negativo
+;        ; Termina l'operazione appena viene trovato un elemento negativo
+;    ]
+;  ]
 
     set period-revenues-per-unit safe-divide (last c-revenues-list)  (sum c-new-memory)
 
@@ -900,7 +911,9 @@ to new-products-creation
 
         set p-production-cost item j p-price-min-list * (1 + delta * p-sustainability + omega * p-quality)
         let price-variability ( item j p-price-max-list - p-production-cost ) * [ c-price ] of my-company
-        set p-price p-production-cost + ( random-float price-variability )
+        let minimum-revenue p-production-cost * minimum-revenue-%  ;minimum-revenue espressa in euro
+        let minimum-price p-production-cost + minimum-revenue
+        set p-price minimum-price + ( random-float (price-variability -  minimum-revenue ))
 
 
 

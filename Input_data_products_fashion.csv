@@ -1,0 +1,9 @@
+p-name,p-price,p-sustainability,p-quality,p-shelf-life,p-price-min,p-prod-cost-min,p-price-max,p-sustainability-min,p-sustainability-max,p-quality-min,p-quality-max,color,p-stock-threshold
+t-shirts,25,0.65,0,40,15,10.5,35,0.455,1,0,0,15,15
+tops,20,0.4,0,20,12,8.4,28,0.28,0.52,0,0,20,5
+sweaters,60,0.6,0,36,36,25.2,84,0.42,0.78,0,0,25,7
+trousers,40,0.45,0,28,24,16.8,56,0.315,0.585,0,0,35,5
+denim,55,0.37,0,48,33,23.1,77,0.259,0.481,0,0,45,5
+coats,150,0.55,0,52,90,63,210,0.385,0.715,0,0,55,2
+tech gear,50,0.25,0,16,30,21,70,0.175,0.325,0,0,65,3
+accessories,25,0.55,0,40,15,10.5,35,0.385,0.715,0,0,70,4

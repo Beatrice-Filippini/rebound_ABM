@@ -1,0 +1,17 @@
+"BehaviorSpace results (NetLogo 6.4.0)","Spreadsheet version 2.0"
+"Bozza modello netlogo 3.15.nlogo"
+"Case study"
+"09/10/2024 19:33:23:050 +0200"
+"min-pxcor","max-pxcor","min-pycor","max-pycor"
+"-16","16","-16","16"
+"[run number]","1","1","1","2","2","2","3","3","3","4","4","4","5","5","5","6","6","6","7","7","7","8","8","8","9","9","9","10","10","10"
+"n-companies","5",,,"5",,,"5",,,"5",,,"5",,,"5",,,"5",,,"5",,,"5",,,"5",,
+"n-users","50",,,"50",,,"50",,,"50",,,"50",,,"50",,,"50",,,"50",,,"50",,,"50",,
+"trigger-max","2",,,"2",,,"2",,,"2",,,"2",,,"2",,,"2",,,"2",,,"2",,,"2",,
+"limit-cons-per-user","0.5",,,"0.5",,,"0.5",,,"0.5",,,"0.5",,,"0.5",,,"0.5",,,"0.5",,,"0.5",,,"0.5",,
+"food-industry","false",,,"false",,,"false",,,"false",,,"false",,,"false",,,"false",,,"false",,,"false",,,"false",,
+"fashion-industry","true",,,"true",,,"true",,,"true",,,"true",,,"true",,,"true",,,"true",,,"true",,,"true",,
+"[total steps]","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250","250"
+
+"[final value]","[step]","mean sa-memory-bought-products","mean sa-memory-avg-sustainability","[step]","mean sa-memory-bought-products","mean sa-memory-avg-sustainability","[step]","mean sa-memory-bought-products","mean sa-memory-avg-sustainability","[step]","mean sa-memory-bought-products","mean sa-memory-avg-sustainability","[step]","mean sa-memory-bought-products","mean sa-memory-avg-sustainability","[step]","mean sa-memory-bought-products","mean sa-memory-avg-sustainability","[step]","mean sa-memory-bought-products","mean sa-memory-avg-sustainability","[step]","mean sa-memory-bought-products","mean sa-memory-avg-sustainability","[step]","mean sa-memory-bought-products","mean sa-memory-avg-sustainability","[step]","mean sa-memory-bought-products","mean sa-memory-avg-sustainability"
+,"250","16.58823529411765","0.43117529656672626","250","16.764705882352942","0.42986188438504686","250","18.392156862745097","0.4303304182980412","250","16.11764705882353","0.4513831777452344","250","15.92156862745098","0.36321442747287314","250","16.333333333333332","0.4479159025923154","250","14.431372549019608","0.4165647890214413","250","13.431372549019608","0.43539819545995667","250","13.156862745098039","0.4139711830526074","250","19.686274509803923","0.40260102930934966"

@@ -145,7 +145,8 @@ globals [
   sa-memory-bought-products
   sa-memory-avg-sustainability
   ticks-scenario
-  p-RL-baseline-2
+  beta-baseline
+
 ]
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -208,15 +209,16 @@ to init-globals-food
   set minimum-revenue-% 0.20
   set p-discount 0.9
   set p-sust-increase 1.1
-  set p-quality-decrease 0.9
+  set p-quality-decrease 0.95
   set g-total-revenues-list []
   set bought-prod-sust-list []
   set c-strategy-frequency 3                                     ;it is considered equal both in the food and fashion sectors
-  set ss-multiplier 0.2                 ;review
+  set ss-multiplier 5                 ;review
   set sa-memory-bought-products []
   set sa-memory-avg-sustainability []
   set ticks-scenario 50
-  set p-RL-baseline-2 0.8
+  set beta-baseline 0
+
 
  end
 
@@ -234,9 +236,9 @@ to init-globals-fashion
   set minimum-revenue-% 0.30
   set p-discount 0.8
   set p-sust-increase 1.1
-  set p-quality-decrease 0.90
+  set p-quality-decrease 0.95
   set c-strategy-frequency 3                                     ;it is considered equal both in the food and fashion sectors
-  set ss-multiplier 0.2                 ;review
+  set ss-multiplier 5                 ;review
 
   set m1 []
   set users-list []
@@ -253,8 +255,9 @@ to init-globals-fashion
   set wasted-prod-cum 0
   set died-products 0
   set bought-products 0
-  set ticks-scenario 50
-  set p-RL-baseline-2 0.8
+  set ticks-scenario 70
+  set beta-baseline 0
+
 
 end
 
@@ -349,7 +352,8 @@ to creation-users
 
 
     set alpha random-float 1    ;quality weight
-    set beta random-float 1     ;sustainability weight
+    ;set beta random-float 1
+    set beta beta-baseline + random-float (1 - beta-baseline) ;sustainability weight
     set gamma random-float 1    ;price weight
     set alpha alpha
     set beta beta
@@ -455,15 +459,21 @@ to creation-companies
 
   ask companies [
     let c-init-stock-list []
-    ;set c-security-stock map [t -> t * ss-multiplier] p-cons-per-user-list                              ;the company's security stock of class i products, is proportional to the consumption rate of class i
-    ;set c-security-stock map [t -> t * ss-multiplier] c-demand
+    ;the company's security stock of class i products, is proportional to the consumption rate of class i
 
     let j 0
     while [j < length c-demand] [
       set c-security-stock lput (ceiling (item j c-demand * ss-multiplier)) c-security-stock
       set j j + 1
     ]
-    ;print (word "c-security-stock: " c-security-stock "  c-demand: " c-demand)
+
+;MODIFICA
+;        let j 0
+;    while [j < length c-demand] [
+;      set c-security-stock lput (ceiling (item j p-cons-per-user-list * 100)) c-security-stock
+;      set j j + 1
+;    ]
+
 
 
     let i 0
@@ -509,11 +519,13 @@ to creation-companies
 ;        print (word "p-sustainability" p-sustainability)
 ;        print "------------------------------------------------------------------"
 
-
+;MODIFICA
         let quality-variability ( item i p-quality-max-list - item i p-quality-min-list )
         let random-component-q random-float quality-variability
         set p-quality (    (item i p-quality-min-list) +  ( random-component-q * ([ c-quality ] of my-company ) ) )
-        ;set p-quality random-float 1 * [ c-quality ] of my-company
+
+;        set p-quality random-float 1 * [ c-quality ] of my-company
+
 
         ;here sustainability and quality are normalized
         let max-sustainability max [ p-sustainability ] of products with [ p-name = my-p-name ]
@@ -618,6 +630,8 @@ to refresh-variables
   set users-list []
   set bought-prod-sust-list []
 
+  print mean [p-quality] of products
+
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; CONSUMERS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -714,7 +728,7 @@ to utility-function-management
     ask products
     [
       ; first, compute the utility assuming that the quantity of stock of the class of products is not relevant (without considering the effective need)
-      set p-utility (   max list ( (p-quality-norm * my-alpha-norm) + (p-sustainability-norm * my-beta-norm) - (p-price-norm * my-gamma-norm)) 0 * p-RL/SL-ratio-norm  ) ^ exponent
+      set p-utility (   max list (( (p-quality-norm * my-alpha-norm) + (p-sustainability-norm * my-beta-norm) - (p-price-norm * my-gamma-norm) )  * p-RL/SL-ratio-norm)  0 ) ^ exponent
 
       set utilities-list lput p-utility utilities-list
       set p-whos-list lput who p-whos-list
@@ -923,10 +937,10 @@ to strategy-reprocess
                 [
                   let sustainability-max-k  (max [p-sustainability] of matching-products)
                   set p-sustainability min (list  (p-sust-increase  * sustainability-max-k )  1)
-
+;MODIFICA
 ;review: food vs fashion
-;                  let mean-quality-k  (mean [p-quality] of matching-products)
-;                  set p-quality max (list  (p-quality-decrease  * mean-quality-k )  0)
+                  let mean-quality-k  (mean [p-quality] of matching-products)
+                  set p-quality max (list  (p-quality-decrease  * mean-quality-k )  0)
                 ]
                 ;else
                 [
@@ -934,13 +948,14 @@ to strategy-reprocess
                   set p-sustainability min (list  (p-sust-increase * sustainability-max-k )  1)
 
 ;review: food vs fashion
-;                  let mean-quality-k  ((item k p-quality-min-list + item k p-quality-max-list) / 2)
-;                  set p-quality max (list  (p-quality-decrease  * mean-quality-k )  0)
+                  let mean-quality-k  ((item k p-quality-min-list + item k p-quality-max-list) / 2)
+                  set p-quality max (list  (p-quality-decrease  * mean-quality-k )  0)
                 ]
                 set p-name p-name-k  ;p-name of the reprocessed product: must be set after the evaluation of sustainability-max-k
 
                 ;review: food vs fashion
-                set p-quality p-quality-decrease * p-quality
+                ;set p-quality p-quality-decrease * p-quality
+
 
 
               ;once identified the name of the destination class of the reprocessing, the corresponding attributes (price, sust...etc) are retrieved
@@ -958,8 +973,7 @@ to strategy-reprocess
               let price-max-k item k p-price-max-list
               let mean-price-k (p-production-cost + price-max-k) / 2
               set p-price mean-price-k
-              ;set p-residual-life item k p-shelf-life-list
-              set p-residual-life (item k p-shelf-life-list * p-RL-baseline-2) + ( (random-float (1 - p-RL-baseline) )* item k p-shelf-life-list )
+              set p-residual-life item k p-shelf-life-list
 
               ; here the assumption is that the reprocessed product will have an average residual-life in line with the new class of products to which it belongs
 
@@ -1024,9 +1038,17 @@ to demand-assessment
       set i i + 1
     ]
     set tot-demand [sum c-demand] of self
+
+;MODIFICA
+          let j 0
+    while [j < length c-demand] [
+      set c-security-stock lput (ceiling (item j c-demand * ss-multiplier)) c-security-stock
+      set j j + 1
+    ]
     ]
 
 end
+
 
 ;Now that the demand has been assessed, companies respond by creating the needed number of products for each class
 to new-products-creation
@@ -1054,16 +1076,27 @@ to new-products-creation
         set p-name item j p-name-list
         let my-p-name p-name
 
-        let sustainability-min-j max (list ([p-sustainability] of products with [p-name = item j p-name-list and owner-id = my-id and primary-prod = 1]) item j p-sustainability-min-list)
+;        let sustainability-min-j max (list ([p-sustainability] of products with [p-name = item j p-name-list and owner-id = my-id and primary-prod = 1]) item j p-sustainability-min-list)
+;        ; prende il valore più alto di sostenibilità tra quella dei prodotti in circolo e quella dalla lista importata dal csv (se non ci sono prodotti in circolo, la p-sust dei prodotti sarebbe  0, quindi prenderebbe il valore del csv)
+;        let sustainability-max-j max (list ([p-sustainability] of products with [p-name = item j p-name-list and owner-id = my-id and primary-prod = 1]) item j p-sustainability-max-list)
+;        let sustainability-variability ( sustainability-max-j - sustainability-min-j )
+;        let random-component-s (random-float sustainability-variability )
+;        set p-sustainability sustainability-min-j + (random-component-s * ([ c-sustainability ] of my-company ) )
+;MODIFICA
+        let sustainability-min-j max (list ([p-sustainability] of products with [p-name = item j p-name-list and owner-id = my-id]) item j p-sustainability-min-list)
         ; prende il valore più alto di sostenibilità tra quella dei prodotti in circolo e quella dalla lista importata dal csv (se non ci sono prodotti in circolo, la p-sust dei prodotti sarebbe  0, quindi prenderebbe il valore del csv)
-        let sustainability-max-j max (list ([p-sustainability] of products with [p-name = item j p-name-list and owner-id = my-id and primary-prod = 1]) item j p-sustainability-max-list)
+        let sustainability-max-j max (list ([p-sustainability] of products with [p-name = item j p-name-list and owner-id = my-id]) item j p-sustainability-max-list)
         let sustainability-variability ( sustainability-max-j - sustainability-min-j )
         let random-component-s (random-float sustainability-variability )
         set p-sustainability sustainability-min-j + (random-component-s * ([ c-sustainability ] of my-company ) )
 
+;MODIFICA
         let quality-variability ( item j p-quality-max-list - item j p-quality-min-list )
-        let random-component-q random-float sustainability-variability
+        let random-component-q random-float quality-variability
         set p-quality (    (item j p-quality-min-list) +  ( random-component-q * ([ c-quality ] of my-company ) ) )
+
+;        set p-quality random-float 1 * ([c-quality] of my-company)
+
 
         ;first i normalize the sustainability and quality scores
         let max-sustainability max [ p-sustainability ] of products with [ p-name = my-p-name ]
@@ -1091,8 +1124,7 @@ to new-products-creation
         ;In order for the product to remain competitive, not too much time must pass from the moment it is produced and when it reaches the shop.
         ;Consequently the minimum limit for RL is set at 80% of the SL (and the maximum will be 100% of the SL)
         set p-shelf-life item j p-shelf-life-list
-        ;set p-residual-life item j p-shelf-life-list
-        set p-residual-life (item j p-shelf-life-list * p-RL-baseline-2) + ( (random-float (1 - p-RL-baseline) )* item j p-shelf-life-list )
+        set p-residual-life item j p-shelf-life-list
         set p-RL/SL-ratio p-residual-life / p-shelf-life
         set owner-id my-id
       ]
@@ -1312,7 +1344,7 @@ SLIDER
 n-companies
 n-companies
 1
-50
+20
 5.0
 1
 1
@@ -1327,7 +1359,7 @@ SLIDER
 n-users
 n-users
 10
-250
+200
 50.0
 5
 1
@@ -1390,6 +1422,7 @@ false
 "" ""
 PENS
 "default" 1.0 0 -16777216 true "" "plot mean [ mean stock ] of users"
+"pen-1" 1.0 0 -7500403 true "" "plot max [mean stock] of users"
 
 TEXTBOX
 109
@@ -1475,13 +1508,12 @@ false
 "" ""
 PENS
 "default" 1.0 0 -955883 true "" "plot wasted-prod "
-"pen-1" 1.0 0 -7500403 true "" "plot died-products"
 
 PLOT
-1124
-18
-1483
-235
+1125
+15
+1488
+230
 N. of buyers
 NIL
 NIL
@@ -1550,7 +1582,7 @@ PENS
 "purchases" 1.0 0 -16777216 true "" "plot (bought-products ) / n-users"
 "avg-prod-sust" 1.0 0 -1184463 true "" "plot mean [p-sustainability] of products"
 "reprocessed-prod-sust" 1.0 2 -14439633 true "" "ifelse (any? products with [primary-prod = 0])\n[ plot mean [p-sustainability] of (products with [primary-prod = 0]) ]\n[ plot 0 ]"
-"pen-3" 1.0 0 -7500403 true "" "ifelse (length bought-prod-sust-list = 0)\n[plot 0]\n[plot mean bought-prod-sust-list]"
+"puchases-sustainability" 1.0 0 -7500403 true "" "ifelse (length bought-prod-sust-list = 0)\n[plot 0]\n[plot mean bought-prod-sust-list]"
 
 MONITOR
 157
@@ -2108,9 +2140,8 @@ NetLogo 6.4.0
     <setup>setup</setup>
     <go>go</go>
     <timeLimit steps="250"/>
-    <metric>mean [ c-sustainability ] of companies</metric>
-    <metric>mean [ c-quality ] of companies</metric>
-    <metric>bought-products</metric>
+    <metric>mean sa-memory-bought-products</metric>
+    <metric>mean sa-memory-avg-sustainability</metric>
     <enumeratedValueSet variable="n-companies">
       <value value="1"/>
       <value value="5"/>
@@ -2128,9 +2159,8 @@ NetLogo 6.4.0
     <setup>setup</setup>
     <go>go</go>
     <timeLimit steps="250"/>
-    <metric>mean [ c-sustainability ] of companies</metric>
-    <metric>mean [ c-quality ] of companies</metric>
-    <metric>bought-products</metric>
+    <metric>mean sa-memory-bought-products</metric>
+    <metric>mean sa-memory-avg-sustainability</metric>
     <enumeratedValueSet variable="n-companies">
       <value value="5"/>
     </enumeratedValueSet>
@@ -2146,9 +2176,8 @@ NetLogo 6.4.0
     <setup>setup</setup>
     <go>go</go>
     <timeLimit steps="250"/>
-    <metric>mean [ c-sustainability ] of companies</metric>
-    <metric>mean [ c-quality ] of companies</metric>
-    <metric>bought-products</metric>
+    <metric>mean sa-memory-bought-products</metric>
+    <metric>mean sa-memory-avg-sustainability</metric>
     <enumeratedValueSet variable="n-companies">
       <value value="5"/>
     </enumeratedValueSet>
@@ -2231,6 +2260,18 @@ NetLogo 6.4.0
     </enumeratedValueSet>
     <enumeratedValueSet variable="fashion-industry">
       <value value="true"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="exp 4 num" repetitions="10" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="250"/>
+    <metric>mean sa-memory-bought-products</metric>
+    <metric>mean sa-memory-avg-sustainability</metric>
+    <enumeratedValueSet variable="beta-baseline">
+      <value value="0"/>
+      <value value="0.2"/>
+      <value value="0.4"/>
     </enumeratedValueSet>
   </experiment>
 </experiments>
